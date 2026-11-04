@@ -72,6 +72,10 @@ const std::vector<recomp::FeatureInfo> &Features()
             "The in-game menu is drawn over it without the shader.",
             0, {"Off", "CRT", "CRT Lottes", "CRT Royale", "CRT Guest", "CRT Light", "Scanlines: light",
                 "Scanlines: strong", "Scanlines: OSSC", "xBRZ", "ScaleFX", "Your own"}},
+        {"stretch", "Graphics", "Stretch to fill",
+            "The picture stretched over the whole window or screen, with no black bars at its sides: wider than it "
+            "should be (on a phone, or an ultrawide monitor), or taller. Widescreen on, it is stretched less.",
+            0, {}},
         {"fps_counter", "Graphics", "FPS counter",
             "The frames shown each second, in the top right corner. The game runs at 60.", 0, {}},
         {"health_refill", "Training", "Health refill",
@@ -169,6 +173,7 @@ Settings LoadSettings(const std::string &path)
     for (size_t i = 0; i < features.size(); ++i) {
         if (features[i].name == "health_refill") settings.health_refill = values[i] != 0;
         else if (features[i].name == "fps_counter") settings.fps_counter = values[i] != 0;
+        else if (features[i].name == "stretch") settings.stretch = values[i] != 0;
         else if (features[i].name == "infinite_time") settings.infinite_time = values[i] != 0;
         else if (features[i].name == "input_display") settings.input_display = values[i] != 0;
         else if (features[i].name == "combo_readout") settings.combo_readout = values[i] != 0;

@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- **Stretch to fill** (Graphics, also in the in-game menu): the picture stretched over the whole screen or window,
+  with no black bars at its sides, for a phone or an ultrawide monitor. It is out of shape: wider than it should be.
+
 ## 0.2.1-beta.1
 
 Online play on Windows works: hosting no longer closes the game when the other player comes. Both players need

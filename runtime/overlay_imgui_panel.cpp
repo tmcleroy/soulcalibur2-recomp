@@ -5,6 +5,7 @@
 #include "overlay_imgui_panel.h"
 #include "sc2_panel.h"
 #include "sc2_touch.h"
+#include "d3d_vblank.h"
 
 #include "imgui.h"
 
@@ -53,14 +54,15 @@ void Side(const Sc2Panel &panel, int player, float width, float height)
     }
 }
 
-/* The hit boxes, over the picture (the game's 640x480 frame, kept to its aspect in the window, as the presenter
-   places it), under the panels */
+/* The hit boxes, over the picture (the game's 640x480 frame, kept to its aspect in the window or stretched over it,
+   as the presenter places it), under the panels */
 void Shapes(const Sc2Panel &panel, float width, float height)
 {
     if (panel.shape_count == 0u) return;
     static const float aspect = std::getenv("RECOMP_D3D_WIDESCREEN") ? 16.0f / 9.0f : 4.0f / 3.0f;
     float w = width, h = height;
-    if (width / height > aspect) w = height * aspect;
+    if (recomp_d3d_present_stretch) {}
+    else if (width / height > aspect) w = height * aspect;
     else h = width / aspect;
     const float left = (width - w) * 0.5f, top = (height - h) * 0.5f, sx = w / 640.0f, sy = h / 480.0f;
     ImDrawList *draw = ImGui::GetBackgroundDrawList();

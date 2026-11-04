@@ -1205,6 +1205,7 @@ int main(int argc, char **argv)
         sc2::TrainingState().no_damage[1] = settings.no_damage[1];
         sc2::TrainingState().one_hit = settings.one_hit;
         sc2::TrainingState().fps_counter = settings.fps_counter;
+        recomp_d3d_present_stretch = settings.stretch;
         sc2::OnlineDisplay() = {settings.online_ping, settings.online_delay, settings.online_hide_names};
         if (settings.scale > 1u && std::getenv("RECOMP_D3D_SCALE") == nullptr)
             setenv("RECOMP_D3D_SCALE", std::to_string(settings.scale).c_str(), 1);
