@@ -1595,6 +1595,20 @@ static bool bind_stage_texture(uint32_t device, uint32_t i, const uint32_t *stat
     /* X8R8G8B8 (swizzled 0x07, linear 0x1e) and X1R5G5B5 (0x03, 0x1c) have no alpha. */
     const uint32_t f = texture.texture.format_byte;
     scale[3] = f == 0x07u || f == 0x1eu || f == 0x03u || f == 0x1cu ? 1.0f : 0.0f;
+    if (!(draw->fvf & 1u) && !layout->pretransformed && state[21] == 2u && (state[28] >> 16u) == 0u) {
+        float matrix[16];
+        /* 5455 SetTransform stores TEXTURE0 (state 2) at device+0x8c0.
+           Its upload at 0x158b20, case 0x220, uses m00/m10/m20 for S
+           and m01/m11/m21 for T: the 2D input is (u,v,1,0). */
+        recomp_guest_load(matrix, device + 0x8c0u + i * 64u, sizeof matrix);
+        program->stages[i].transform_uv = true;
+        for (uint32_t column = 0u; column < 2u; ++column)
+            for (uint32_t row = 0u; row < 4u; ++row) {
+                const float value = matrix[row * 4u + column];
+                if (!isfinite(value)) recomp_stop(2, "d3d8:general-uv-transform:stage=%u", i);
+                program->constants[RECOMP_D3D_PIXEL_CONSTANT_UV + i * 2u + column][row] = value;
+            }
+    }
     return true;
 }
 
@@ -1849,7 +1863,7 @@ static void general_fixed_stages(uint32_t device, const RecompD3dVertexLayout *l
         out->result_arg = state[20] == RECOMP_D3DTA_TEMP ? RECOMP_D3DTA_TEMP : RECOMP_D3DTA_CURRENT;
         /* A program's oTn feeds stage n; fixed function reads TEXCOORDINDEX. */
         out->texcoord = program_draw ? i : state[28] & 0xffffu;
-        if (!program_draw && ((state[28] >> 16u) != 0u || state[21] != 0u))
+        if (!program_draw && ((state[28] >> 16u) != 0u || (state[21] != 0u && state[21] != 2u)))
             recomp_stop(2, "d3d8:general-texcoord:stage=%u:%08x:%u", i, state[28], state[21]);
         out->alpha_kill = state[11] == 4u;
         out->sampled = bind_stage_texture(device, i, state, out->texcoord, layout, draw);

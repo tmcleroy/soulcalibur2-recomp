@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- **Shader preparation (SDL GPU)**: prepare known graphics before playing, reuse cached shaders, and compile missing shaders in parallel. Choose when to prepare them in the launcher or feature menu.
+
+- **Animated effects**: apply texture movement and scaling so effects such as Necrid's flames animate instead of showing a static tiled texture.
+
 ## 0.2.1-beta.1
 
 Online play on Windows works: hosting no longer closes the game when the other player comes. Both players need

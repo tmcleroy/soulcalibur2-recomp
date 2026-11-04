@@ -34,6 +34,7 @@
 #include "runner_load.h"
 #include "save_transaction.h"
 #include "sc2_settings.h"
+#include "sc2_graphics_inventory.h"
 #include "sc2_menu.h"
 #include "sc2_training.h"
 #include "sc2_guest.h"
@@ -1192,9 +1193,23 @@ int main(int argc, char **argv)
     setenv("RECOMP_WINDOW_TITLE", "Soulcalibur II", 0);
     setenv("RECOMP_SCREENSHOT_NAME", "Soulcalibur II", 0); // (Pictures/Soulcalibur II/Soulcalibur II-....png)
     int shader = 0;
+    bool graphics_prepare = false;
+    std::string graphics_folder;
     if (!settingsPath.empty()) {
         const sc2::Settings settings = sc2::LoadSettings(settingsPath);
         shader = settings.shader;
+        graphics_prepare = settings.graphics_prepare;
+        const auto graphics = std::filesystem::u8path(settingsPath).parent_path() / "graphics-cache";
+        std::error_code cache_error;
+        std::filesystem::create_directories(graphics, cache_error);
+        if (!cache_error) {
+            graphics_folder = graphics.u8string();
+            setenv("RECOMP_SHADER_CACHE", graphics_folder.c_str(), 0);
+            setenv("RECOMP_GRAPHICS_CATALOG", graphics_folder.c_str(), 0);
+        }
+        setenv("RECOMP_GRAPHICS_PREPARE", graphics_prepare ? "1" : "0", 0);
+        if (const char *catalog = std::getenv("RECOMP_GRAPHICS_CATALOG")) graphics_folder = catalog;
+        if (const char *prepare = std::getenv("RECOMP_GRAPHICS_PREPARE")) graphics_prepare = std::strcmp(prepare, "0") != 0;
         sc2::TrainingState().health_refill = settings.health_refill;
         sc2::TrainingState().infinite_time = settings.infinite_time;
         sc2::TrainingState().input_display = settings.input_display;
@@ -1255,6 +1270,10 @@ int main(int argc, char **argv)
         }
         memory[SC2_MEDIA_PATCH_ADDRESS] = SC2_MEDIA_PATCH_BYTE;
     }
+    // Generate the inventory in native code before any guest frame executes.
+    // The executable was authenticated above; no Python installation is needed.
+    if (graphics_prepare && !graphics_folder.empty())
+        sc2::PrepareGraphicsInventory(memory, graphics_folder);
     const auto imageEnd = static_cast<std::uint64_t>(parsed.metadata.header.baseAddress) +
         parsed.metadata.header.sizeImage;
     if (!xbox_HeapSetImageEnd(static_cast<std::uint32_t>(imageEnd))) {

@@ -6,6 +6,8 @@
 #include "launcher.h"
 
 #include "guest_page.h"
+#include "imgui.h"
+#include "layout.h"
 
 #include "../../runtime/sc2_settings.h"
 #include "../../runtime/sc2_xbe.h"
@@ -24,6 +26,32 @@
 #include <system_error>
 
 namespace {
+
+#ifdef RECOMP_SDL_GPU_PRESENTER
+void RenderingPage(launcher::PageContext &page) {
+    layout::heading("Rendering", "Choose when graphics are prepared. Changes apply the next time you launch the game.", page.width);
+    const auto &features = sc2::Features();
+    auto values = recomp::FeatureValues(page.settings, features);
+    layout::label("STARTUP");
+    layout::Card card(page.width);
+    ImGui::BeginDisabled(page.playing);
+    for (size_t i = 0; i < features.size(); ++i) {
+        const auto &feature = features[i];
+        if (feature.name != "graphics_prepare") continue;
+        layout::row(page.width, feature.title.c_str(), feature.description.c_str(), 190.0f, 36.0f, [&] {
+            if (ui::dropdown("##prepare", feature.choices, values[i], 190.0f)) {
+                recomp::SetFeature(page.settings, features, i, values[i]);
+                page.settings.save();
+            }
+        });
+    }
+    ImGui::EndDisabled();
+    card.end();
+    if (page.playing)
+        ui::text("Close the game to change these settings.", ui::Font::Regular, ui::size::kDetail, ui::palette().secondary, page.width);
+}
+
+#endif
 
 // SHA-256 (FIPS 180-4) of what `read` gives (a count of bytes read into the buffer, 0 at the end), as lowercase hex.
 template <typename Read>
@@ -217,6 +245,9 @@ const launcher::Description &launcher::describe() {
         Description d;
         d.original = "on the Xbox";
         d.pages = {{"Guest", GuestPage, GuestDrop, GuestBusy}};
+#ifdef RECOMP_SDL_GPU_PRESENTER
+        d.pages.push_back({"Rendering", RenderingPage});
+#endif
         d.open_on_game_page = true;
         d.file_heading = "GAME FILES";
 #ifdef __ANDROID__

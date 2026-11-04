@@ -72,3 +72,15 @@ upstream as its own PR:
 The lifter gets every bound address as `--manual-functions`
 (`tools/build_game.py`), so tail jumps into replaced SDK functions go
 through the runtime's lookup instead of running the converted original.
+
+## Animated fixed-function texture coordinates
+
+The shared runtime pin supports independent affine COUNT2 UV transforms in
+general fixed-function and combiner pixel programs. SC2 captures each sampled
+stage's texture matrix from its 5455 device layout and passes semantic columns
+to the runtime. Coordinates expand as (u,v,1,0): translation uses the third row.
+Transforms remain per-stage even when stages read the same vertex UV set.
+Matrices are dynamic constants, not shader-cache keys. Pretransformed and
+programmable vertices are excluded; unsupported coordinate generation and
+transform modes remain guarded. This restores atlas animation such as Necrid's
+chest flame and hand effect without interpolation or gameplay changes.

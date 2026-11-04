@@ -72,6 +72,12 @@ const std::vector<recomp::FeatureInfo> &Features()
             "The in-game menu is drawn over it without the shader.",
             0, {"Off", "CRT", "CRT Lottes", "CRT Royale", "CRT Guest", "CRT Light", "Scanlines: light",
                 "Scanlines: strong", "Scanlines: OSSC", "xBRZ", "ScaleFX", "Your own"}},
+#ifdef RECOMP_SDL_GPU_PRESENTER
+        {"graphics_prepare", "Rendering", "Shader preparation",
+            "Prepare available shader combinations before playing to reduce compilation hitches. "
+            "Cached shaders are reused. Unseen combinations may still compile during play. Changes apply next launch.",
+            recomp::kFeatureEnhanced, {"During play", "Before playing"}},
+#endif
         {"fps_counter", "Graphics", "FPS counter",
             "The frames shown each second, in the top right corner. The game runs at 60.", 0, {}},
         {"health_refill", "Training", "Health refill",
@@ -167,7 +173,8 @@ Settings LoadSettings(const std::string &path)
     const std::vector<int> values = recomp::FeatureValues(ini, features);
     Settings settings;
     for (size_t i = 0; i < features.size(); ++i) {
-        if (features[i].name == "health_refill") settings.health_refill = values[i] != 0;
+        if (features[i].name == "graphics_prepare") settings.graphics_prepare = values[i] != 0;
+        else if (features[i].name == "health_refill") settings.health_refill = values[i] != 0;
         else if (features[i].name == "fps_counter") settings.fps_counter = values[i] != 0;
         else if (features[i].name == "infinite_time") settings.infinite_time = values[i] != 0;
         else if (features[i].name == "input_display") settings.input_display = values[i] != 0;

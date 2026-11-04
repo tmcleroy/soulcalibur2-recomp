@@ -33,3 +33,8 @@ target_link_libraries(launcher PRIVATE sc2_guest_lib)
 # (the supported Default.xbe, as tools/build_game.py checks it)
 target_compile_definitions(launcher PRIVATE
     LAUNCHER_XBE_SHA256="7ce12851850ab46766f77c612b251afe7c8bd81f879e11b4836bdf766be542c6")
+
+# Keep settings aligned with the selected game presenter.
+if(NOT WIN32 OR RECOMP_WINDOWS_SDL_GPU)
+    target_compile_definitions(launcher PRIVATE RECOMP_SDL_GPU_PRESENTER=1)
+endif()
