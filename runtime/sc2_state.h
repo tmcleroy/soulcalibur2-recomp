@@ -31,7 +31,7 @@ struct SaveState {
 };
 
 void SaveFrame(SaveState &state);
-void LoadFrame(const SaveState &state);
+void LoadFrame(const SaveState &state, bool reset_visual = true);
 
 // The in-game menu's save states (sc2_frame.cpp): nine slots, kept while the game runs. Asked for between frames,
 // done at the start of the next. A state loads only in the scene it was saved in (the same fight, the same menu):

@@ -6,6 +6,9 @@
 #include "launcher.h"
 
 #include "guest_page.h"
+#include "imgui.h"
+#include "layout.h"
+#include <SDL3/SDL.h>
 
 #include "../../runtime/sc2_settings.h"
 #include "../../runtime/sc2_xbe.h"
@@ -24,6 +27,66 @@
 #include <system_error>
 
 namespace {
+
+#ifdef RECOMP_SDL_GPU_PRESENTER
+void RenderingPage(launcher::PageContext &page) {
+    sc2::MigrateRenderingSettings(page.settings);
+    layout::heading("Rendering", "Choose smoother motion and how shaders are prepared. Changes apply the next time you launch the game.", page.width);
+    const auto &features = sc2::Features();
+    auto values = recomp::FeatureValues(page.settings, features);
+    layout::label("MOTION AND STARTUP");
+    layout::Card card(page.width);
+    ImGui::BeginDisabled(page.playing);
+    bool first = true;
+    for (size_t i = 0; i < features.size(); ++i) {
+        const auto &feature = features[i];
+        if (feature.category != "Rendering") continue;
+        if (!first) layout::inset_separator(page.width);
+        first = false;
+        ImGui::PushID(feature.name.c_str());
+        layout::row(page.width, feature.title.c_str(), feature.description.c_str(), 190.0f, 36.0f, [&] {
+            if (ui::dropdown("##choice", feature.choices, values[i], 190.0f)) {
+                recomp::SetFeature(page.settings, features, i, values[i]);
+                page.settings.save();
+            }
+        });
+        if (feature.name == "frame_interpolation" && values[i] == 2) {
+            static char rate[64] = {};
+            static std::string settings_path;
+            const std::string path = page.settings.path().u8string();
+            if (settings_path != path) {
+                const std::string saved = page.settings.get("rendering", "custom_fps");
+                std::snprintf(rate, sizeof rate, "%s", sc2::ValidRenderRate(saved) ? saved.c_str() : "144");
+                settings_path = path;
+            }
+            layout::inset_separator(page.width);
+            layout::row(page.width, "Custom frame rate", "30 to 1000 frames per second. Actual performance depends on your computer.",
+                190.0f, 36.0f, [&] {
+                    if (ui::text_field("##fps", rate, sizeof rate, "144", 190.0f) && sc2::ValidRenderRate(rate)) {
+                        page.settings.set("rendering", "custom_fps", rate);
+                        page.settings.save();
+                    }
+                });
+            if (!sc2::ValidRenderRate(rate)) {
+                layout::row(page.width, "Enter a number from 30 to 1000", "The last valid rate is kept until this value is valid.",
+                    0, 0, [] {});
+            }
+        }
+        ImGui::PopID();
+    }
+    ImGui::EndDisabled();
+    card.end();
+    ui::gap(24);
+    const SDL_DisplayMode *display = SDL_GetCurrentDisplayMode(SDL_GetDisplayForWindow(page.window));
+    if (display) {
+        char monitor[80];
+        std::snprintf(monitor, sizeof monitor, "Current monitor: %.3f Hz", display->refresh_rate);
+        ui::text(monitor, ui::Font::Regular, ui::size::kDetail, ui::palette().secondary, page.width);
+    }
+    if (page.playing)
+        ui::text("Close the game to change these settings.", ui::Font::Regular, ui::size::kDetail, ui::palette().secondary, page.width);
+}
+#endif
 
 // SHA-256 (FIPS 180-4) of what `read` gives (a count of bytes read into the buffer, 0 at the end), as lowercase hex.
 template <typename Read>
@@ -217,6 +280,9 @@ const launcher::Description &launcher::describe() {
         Description d;
         d.original = "on the Xbox";
         d.pages = {{"Guest", GuestPage, GuestDrop, GuestBusy}};
+#ifdef RECOMP_SDL_GPU_PRESENTER
+        d.pages.push_back({"Rendering", RenderingPage});
+#endif
         d.open_on_game_page = true;
         d.file_heading = "GAME FILES";
 #ifdef __ANDROID__

@@ -8,6 +8,7 @@
 #include "program_manual.h"
 #include "sc2_guest.h"
 #include "scene_freeze_adapter.h"
+#include "sc2_scene_probe.h"
 
 #include <stdbool.h>
 #include <stdio.h>
@@ -15,6 +16,13 @@
 #include <string.h>
 
 uint64_t xbox_ReadTimeStampCounter(void);
+extern void sub_00023C30(void);
+static void skin_snapshot(void)
+{
+    const uint32_t model = *recomp_memory_u32(recomp_runtime.registers.esp + 4u);
+    sub_00023C30();
+    sc2_scene_probe_skin(model);
+}
 
 extern void sub_00090280(void);
 extern void sub_00044360(void);
@@ -520,6 +528,7 @@ RecompFunction sc2_wm_select_lookup(uint32_t address);
 
 RecompFunction recomp_sc2_hooks_lookup_manual(uint32_t address)
 {
+    if (address == 0x00023c30u) return skin_snapshot;
     switch (address) {
     case 0x00090280u: return movie_scene_update;
     case 0x00044360u: return weapon_bones_set;

@@ -9,6 +9,7 @@
 #include "d3d_vertex_shader_model.h"
 #include "kernel_abi.h"
 #include "scene_freeze_adapter.h"
+#include "sc2_scene_probe.h"
 #include "stop_report.h"
 #include "xapi_time_adapter.h"
 
@@ -1434,6 +1435,7 @@ static struct {
 static uint32_t gather_first;   /* the draw's first vertex index in the streams */
 /* SetModelView's model view while a composite overrides the device transforms. */
 static bool model_view_active;
+static uint32_t model_view_source;
 static float model_view[16];
 static float model_composite[16];
 
@@ -1595,6 +1597,20 @@ static bool bind_stage_texture(uint32_t device, uint32_t i, const uint32_t *stat
     /* X8R8G8B8 (swizzled 0x07, linear 0x1e) and X1R5G5B5 (0x03, 0x1c) have no alpha. */
     const uint32_t f = texture.texture.format_byte;
     scale[3] = f == 0x07u || f == 0x1eu || f == 0x03u || f == 0x1cu ? 1.0f : 0.0f;
+    if (!(draw->fvf & 1u) && !layout->pretransformed && state[21] == 2u && (state[28] >> 16u) == 0u) {
+        float matrix[16];
+        /* 5455 SetTransform stores TEXTURE0 (state 2) at device+0x8c0.
+           Its upload at 0x158b20, case 0x220, uses m00/m10/m20 for S
+           and m01/m11/m21 for T: the 2D input is (u,v,1,0). */
+        recomp_guest_load(matrix, device + 0x8c0u + i * 64u, sizeof matrix);
+        program->stages[i].transform_uv = true;
+        for (uint32_t column = 0u; column < 2u; ++column)
+            for (uint32_t row = 0u; row < 4u; ++row) {
+                const float value = matrix[row * 4u + column];
+                if (!isfinite(value)) recomp_stop(2, "d3d8:general-uv-transform:stage=%u", i);
+                program->constants[RECOMP_D3D_PIXEL_CONSTANT_UV + i * 2u + column][row] = value;
+            }
+    }
     return true;
 }
 
@@ -1849,7 +1865,7 @@ static void general_fixed_stages(uint32_t device, const RecompD3dVertexLayout *l
         out->result_arg = state[20] == RECOMP_D3DTA_TEMP ? RECOMP_D3DTA_TEMP : RECOMP_D3DTA_CURRENT;
         /* A program's oTn feeds stage n; fixed function reads TEXCOORDINDEX. */
         out->texcoord = program_draw ? i : state[28] & 0xffffu;
-        if (!program_draw && ((state[28] >> 16u) != 0u || state[21] != 0u))
+        if (!program_draw && ((state[28] >> 16u) != 0u || (state[21] != 0u && state[21] != 2u)))
             recomp_stop(2, "d3d8:general-texcoord:stage=%u:%08x:%u", i, state[28], state[21]);
         out->alpha_kill = state[11] == 4u;
         out->sampled = bind_stage_texture(device, i, state, out->texcoord, layout, draw);
@@ -1994,11 +2010,26 @@ static void submit_draw(uint32_t primitive, uint32_t count, uint32_t vertices,
         largest -= smallest;
     }
     draw->vertex_count = largest + 1u;
+    uint32_t scene_position = stride == 32u ? vertices : 0u;
+    draw->visual_vertex_source = vertices & 0x3ffffffu;
+    draw->visual_transform_source = model_view_active ? model_view_source : 0u;
     uint8_t *packed = NULL;
     if (gather.active) {
         /* Declaration streams gathered into FVF order (declaration_fvf). */
         if (gather_first == UINT32_MAX) recomp_stop(2, "d3d8:gather-user-pointer");
         packed = gather_vertices(gather_first + smallest, draw->vertex_count, layout.stride);
+        scene_position = 0u;
+        draw->visual_vertex_source = 0u;
+        if (gather.count && gather.part[0].size >= 12u) {
+            const uint32_t slot = STREAMS + gather.part[0].stream * 12u;
+            const uint32_t step = *recomp_memory_u32(slot), buffer = *recomp_memory_u32(slot + 8u);
+            uint32_t base;
+            if (buffer && recomp_d3d_texture_resolve_cpu_address(*recomp_memory_u32(buffer+4u), &base)) {
+                const uint32_t position = base + (gather_first+smallest)*step + gather.part[0].offset;
+                draw->visual_vertex_source = position & 0x3ffffffu;
+                if (step == 32u) scene_position = position;
+            } else draw->visual_vertex_source = 0u;
+        }
         draw->vertex_bytes = packed;
         draw->vertex_stride = layout.stride;
         draw->index_bytes = indices;
@@ -2168,6 +2199,8 @@ static void submit_draw(uint32_t primitive, uint32_t count, uint32_t vertices,
         general_fog(device, &layout, draw, program);
     }
     command.type = RECOMP_D3D_PRESENTER_COMMAND_DRAW;
+    if (scene_position && !points && !program && !layout.pretransformed && !draw->blend_weight_count)
+        sc2_scene_attach(draw, scene_position);
     if (native_line) {
         draw->line_width = line_width();
         draw->line_antialias = state->edge_antialias != 0u;
@@ -2410,10 +2443,12 @@ static void set_model_view(void)
     if (composite == 0u) {
         *dirty = (*dirty & 0x7ffffdffu) | 0x200u;
         model_view_active = false;
+        model_view_source = 0u;
     } else {
         if (matrix == 0u) recomp_stop(2, "d3d8:model-view-pointer");
         *dirty = (*dirty & 0xfffffdffu) | 0x80000000u;
         recomp_guest_load(model_view, matrix, sizeof model_view);
+        model_view_source = matrix & 0x3ffffffu;
         recomp_guest_load(model_composite, composite, sizeof model_composite);
         if ((*recomp_memory_u32(device + 8u) & 0x10u) == 0u)
             recomp_guest_store(device + 0x5a0u, model_view, sizeof model_view);

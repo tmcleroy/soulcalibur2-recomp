@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <cstdlib>
+#include <cmath>
 #include <filesystem>
 
 namespace sc2 {
@@ -72,6 +73,18 @@ const std::vector<recomp::FeatureInfo> &Features()
             "The in-game menu is drawn over it without the shader.",
             0, {"Off", "CRT", "CRT Lottes", "CRT Royale", "CRT Guest", "CRT Light", "Scanlines: light",
                 "Scanlines: strong", "Scanlines: OSSC", "xBRZ", "ScaleFX", "Your own"}},
+#ifdef RECOMP_SDL_GPU_PRESENTER
+#ifdef _WIN32
+        {"frame_interpolation", "Rendering", "Frame interpolation",
+            "Smoother motion while gameplay stays at 60 Hz. Uses a frame of visual history, plus rendering/display delay. "
+            "Set a custom rate on the Rendering page. Changes apply next launch.",
+            0, {"Off (original 60 Hz)", "Match monitor", "Custom rate"}},
+#endif
+        {"graphics_prepare", "Rendering", "Shader preparation",
+            "Prepare available shader combinations before playing to reduce compilation hitches. "
+            "Cached shaders are reused. Unseen combinations may still compile during play. Changes apply next launch.",
+            recomp::kFeatureEnhanced, {"During play", "Before playing"}},
+#endif
         {"fps_counter", "Graphics", "FPS counter",
             "The frames shown each second, in the top right corner. The game runs at 60.", 0, {}},
         {"health_refill", "Training", "Health refill",
@@ -159,15 +172,54 @@ std::string ShaderPreset(int choice, const std::string &settings_path)
     return found.empty() ? std::string() : found.front().string();
 }
 
+bool ValidRenderRate(const std::string &text)
+{
+    char *end = nullptr;
+    const double rate = std::strtod(text.c_str(), &end);
+    return end != text.c_str() && *end == '\0' && std::isfinite(rate) && rate >= 30.0 && rate <= 1000.0;
+}
+
+void MigrateRenderingSettings(recomp::Ini &ini)
+{
+    const std::string legacy = ini.get("rendering", "fps");
+    if (legacy.empty()) return;
+    if (ValidRenderRate(legacy)) ini.set("rendering", "custom_fps", legacy);
+    if (recomp::Preset(ini) != "pure") {
+        const bool had_prepare = !ini.get("features", "graphics_prepare").empty();
+        const auto &features = Features();
+        for (size_t i = 0; i < features.size(); ++i) {
+            if (features[i].name == "graphics_prepare" && !had_prepare) {
+                recomp::SetFeature(ini, features, i, 1);
+                continue;
+            }
+            if (!ini.get("features", features[i].name).empty()) continue;
+            if (features[i].name == "frame_interpolation")
+                recomp::SetFeature(ini, features, i, legacy == "monitor" ? 1 : ValidRenderRate(legacy) ? 2 : 0);
+            else if (features[i].name == "graphics_prepare")
+                recomp::SetFeature(ini, features, i, 1);
+        }
+    }
+    ini.set("rendering", "fps", "");
+    ini.save();
+}
+
 Settings LoadSettings(const std::string &path)
 {
     recomp::Ini ini(path);
     ini.load();
+    MigrateRenderingSettings(ini);
     const auto &features = Features();
     const std::vector<int> values = recomp::FeatureValues(ini, features);
     Settings settings;
+    settings.render_fps = "off";
     for (size_t i = 0; i < features.size(); ++i) {
-        if (features[i].name == "health_refill") settings.health_refill = values[i] != 0;
+        if (features[i].name == "frame_interpolation") {
+            const std::string rate = ini.get("rendering", "custom_fps");
+            settings.render_fps = values[i] == 1 ? "monitor" : values[i] == 2 ?
+                (ValidRenderRate(rate) ? rate : "144") : "off";
+        }
+        else if (features[i].name == "graphics_prepare") settings.graphics_prepare = values[i] != 0;
+        else if (features[i].name == "health_refill") settings.health_refill = values[i] != 0;
         else if (features[i].name == "fps_counter") settings.fps_counter = values[i] != 0;
         else if (features[i].name == "infinite_time") settings.infinite_time = values[i] != 0;
         else if (features[i].name == "input_display") settings.input_display = values[i] != 0;

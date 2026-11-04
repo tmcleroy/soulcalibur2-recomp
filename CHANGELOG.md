@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- **Optional interpolation (Windows SDL GPU)**: render intermediate frames at the monitor or a custom rate while simulation remains 60 Hz. Includes mesh matching and seam corrections, with production-time pacing and cached matching to reduce rendering delay, explicit visual-delay disclosure and opt-in software timing diagnostics.
+
+- **Shader preparation (SDL GPU)**: prepare known graphics before playing, reuse cached shaders, and compile missing shaders in parallel. Choose when to prepare them in the launcher or feature menu.
+
+- **Animated effects**: apply texture movement and scaling so effects such as Necrid's flames animate instead of showing a static tiled texture.
+
 ## 0.2.1-beta.1
 
 Online play on Windows works: hosting no longer closes the game when the other player comes. Both players need

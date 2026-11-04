@@ -15,6 +15,7 @@
 
 extern "C" {
 #include "audio_output.h"
+#include "d3d_vblank.h"
 #include "kernel_abi.h"
 #include "scene_freeze_adapter.h"
 #include "sc2_hooks.h"
@@ -56,6 +57,7 @@ bool DoAsked()
         return false;
     }
     recomp_kernel_drain_others();
+    recomp_d3d_visual_reset();
     sc2::LoadFrame(state);
     std::snprintf(note, sizeof note, "State %d loaded", slot);
     sc2::TrainingNote(note);
@@ -93,6 +95,11 @@ extern "C" void sc2_android_frame(void); // (sc2_android.cpp: the log's speed li
 extern "C" void sc2_frame_begins(void)
 {
     sc2_frame_thread = recomp_kernel_current_thread_id();
+    static unsigned last_scene;
+    if (last_scene != sc2_scene_switches || sc2_net_live || sc2::GameSpeed() != 1.0) {
+        recomp_d3d_visual_reset();
+        last_scene = sc2_scene_switches;
+    }
 #ifdef __ANDROID__
     sc2_android_frame();
 #endif
@@ -127,10 +134,13 @@ extern "C" void sc2_frame_begins(void)
     sc2_fast_forward = 0;
     recomp_kernel_drain_others();
     if (!held.valid) {
+        recomp_d3d_visual_reset();
         sc2::SaveFrame(held);
         return;
     }
-    sc2::LoadFrame(held);
+    // Replaying the same held frame is continuous presentation (the photo
+    // camera can still move). Keep immutable meshes/history across restores.
+    sc2::LoadFrame(held, action == SC2_FREEZE_STEP);
     if (action == SC2_FREEZE_STEP) {
         held.valid = false; // (this frame goes on; the next is held)
         sc2::TrainingFrame();

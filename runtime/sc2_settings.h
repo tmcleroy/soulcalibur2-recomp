@@ -22,8 +22,14 @@ const std::vector<recomp::FeatureInfo> &Features();
    player's gamepad drives them. */
 const recomp::BindTable &BindingTable();
 
+/* Move the preview's old rendering key into the shared feature settings once. */
+void MigrateRenderingSettings(recomp::Ini &ini);
+bool ValidRenderRate(const std::string &text);
+
 /* What settings.ini chooses, as the runner uses it. */
 struct Settings {
+    std::string render_fps; // empty/off, monitor, or a numeric presentation rate
+    bool graphics_prepare = false;
     unsigned scale = 1;   /* internal resolution: N times 640x480 */
     int shader = 0;       /* the Shader feature's choice (ShaderPreset) */
     bool health_refill = false;

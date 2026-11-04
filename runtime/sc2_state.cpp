@@ -3,6 +3,7 @@
 
 extern "C" {
 #include "kernel_abi.h"
+#include "d3d_vblank.h"
 #include "xbox_memory_layout.h"
 }
 
@@ -37,9 +38,10 @@ void SaveFrame(SaveState &state)
     state.valid = true;
 }
 
-void LoadFrame(const SaveState &state)
+void LoadFrame(const SaveState &state, bool reset_visual)
 {
     if (!state.valid) return;
+    if (reset_visual) recomp_d3d_visual_reset();
     // (left alone: the other threads' memory, and the kernel's page and above)
     std::vector<std::pair<std::uint32_t, std::uint32_t>> kept;
     std::uint32_t base = 0u, size = 0u;

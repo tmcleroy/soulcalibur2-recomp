@@ -45,6 +45,7 @@
 
 extern "C" {
 #include "kernel_abi.h"
+#include "d3d_vblank.h"
 #include "scene_freeze_adapter.h"
 #include "runtime.h"
 #include "sc2_hooks.h"
@@ -664,7 +665,11 @@ void FpsText(char *out, size_t size)
         frames = 0u;
         since = Clock::now();
     }
-    if (TrainingState().fps_counter) std::snprintf(out, size, "%.0f FPS", rate);
+    if (TrainingState().fps_counter) {
+        const double rendered = recomp_d3d_visual_fps();
+        if (rendered > 0) std::snprintf(out, size, "%.0f FPS/%.0f sim", rendered, rate);
+        else std::snprintf(out, size, "%.0f FPS", rate);
+    }
 }
 
 void ApplyTraining(uint32_t)
