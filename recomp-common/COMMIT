@@ -1,5 +1,5 @@
 # A copy of recomp-common's src/ and launcher/, made by tools/sync-common.sh. Do not change it here.
-commit 417557e1c835f2a11d7eb1f38da520f47f5f4656
+commit b444e24e190de1d891b57fc53d6b65e4f31d183a
 1c52d24d40cf1bf66dfa57e24ae73a6bdbf8f16ea4e9f8e186dca0adf2387aa1  folders.h
 06d9b4b81ca0a67de23c85133c1335f3954cefc6834887b9e4d785175d5bb12b  gamepads.h
 3cdcd5d022ca8dc02d9c212dfc04784879a24107fdbf977c0a81f8b8ac00b516  launcher/embed_fonts.cmake
@@ -7,7 +7,7 @@ commit 417557e1c835f2a11d7eb1f38da520f47f5f4656
 d46fc703fd348d6a9acb65196377176314c4565245fbe376c5d53c8f965b99a0  launcher/example/description.cpp
 4e4ab0d0fc80effb53dd09b07ce18a40f653b05e8fd35fe83d50292d962a6e7b  launcher/example/game.cpp
 47f0b536566ddeaa0ab5e484680ef708b389537c997cd05590f2deb8167787c8  launcher/launcher.cmake
-7b03bb168305d75619315da39ac831b8c0bd7f2acd1dfcd965b1d22cae165da1  launcher/src/app.cpp
+1d210a323edd34f654a4149917f40b99bd5af2256a71392bc5bddb153812115a  launcher/src/app.cpp
 1cc06e55e0a792bc4bdab128347b2ecc7bd4ca606cb3e5894ccf8d75974cd47c  launcher/src/app.h
 496e98a4b738f3ae9f6836c22ad13ba927e981be39a22a00d27eda3d039d99e5  launcher/src/bindings.h
 1950e887891f79e29d75be9cd42ab53dedce6de569b8d8f5cf68d13c79c5e5fa  launcher/src/embedded.h

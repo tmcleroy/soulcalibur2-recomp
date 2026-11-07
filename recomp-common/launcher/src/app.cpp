@@ -353,6 +353,9 @@ bool prepare_folders(bool ask) {
     return true;
 }
 
+// The reason given to a run whose log says the system has no graphics API the game can draw with (no driver)
+static const char* const kGpuDriverReason = "gpu:no-driver";
+
 // The game's log is written over at each start: the log of a run that stopped with an error is kept beside it
 // (logs/stopped-<when>.log, the newest five), to send with a report
 StoppedLog keep_stopped_log(const std::filesystem::path& folder) {
@@ -392,7 +395,10 @@ StoppedLog keep_stopped_log(const std::filesystem::path& folder) {
     // What stopped it, when the runtime said ("recomp stop: <id> ..."): its last such line
     std::ifstream in(kept.path, std::ios::binary);
     std::string line;
+    bool no_gpu = false;
     while (std::getline(in, line)) {
+        // (SDL's own words when the system has no graphics API the game can draw with: a driver's matter, said so)
+        no_gpu = no_gpu || line.find("No supported SDL_GPU backend found") != std::string::npos;
         const size_t at = line.find("recomp stop: ");
         if (at != std::string::npos) {
             std::string id = line.substr(at + 13);
@@ -402,6 +408,9 @@ StoppedLog keep_stopped_log(const std::filesystem::path& folder) {
             }
             kept.reason = id;
         }
+    }
+    if (no_gpu) {
+        kept.reason = kGpuDriverReason;
     }
     return kept;
 }
@@ -414,6 +423,18 @@ static std::string stopped_text(const std::string& name, int code, const std::st
 // What a code means, for a player: a crash (a signal, or a Windows exception), or the runtime stopping on
 // purpose (its "recomp stop: <area>:..." line names the part of the game it was in), or "" when not known
 static std::string stopped_meaning(int code, const std::string& reason) {
+    if (reason == kGpuDriverReason) {
+#ifdef _WIN32
+        return "Your graphics driver has no Direct3D 12 or Vulkan support, which the game needs to draw. Update your "
+               "graphics card's driver from NVIDIA, AMD or Intel; a card too old for either can't run it.";
+#elif defined(__APPLE__)
+        return "This Mac's graphics have no Metal support, which the game needs to draw. It needs macOS on a Mac "
+               "with Metal graphics.";
+#else
+        return "Your graphics driver has no Vulkan support, which the game needs to draw. Install or update your "
+               "system's Vulkan driver (Mesa's, or your graphics card maker's).";
+#endif
+    }
     if (!reason.empty()) {
         static const std::pair<const char*, const char*> kAreas[] = {
             {"dsound:", "its sound"}, {"audio", "its sound"}, {"d3d", "its graphics"}, {"input:", "the controllers"},
