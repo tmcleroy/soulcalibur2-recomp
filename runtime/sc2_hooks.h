@@ -18,6 +18,8 @@ RecompFunction recomp_sc2_hooks_lookup_manual(uint32_t address);
    timed from a scene's start (runner --input-scene). */
 extern uint32_t sc2_scene;
 extern uint32_t sc2_scene_switches;
+/* How many times the fight has stepped (0x4A090): not while the game's own pause holds the fight */
+extern uint32_t sc2_fight_steps;
 /* A press asking the movie playing to end (sc2_menu.cpp), taken by the movie scene's update */
 extern int sc2_movie_skip;
 

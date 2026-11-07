@@ -232,6 +232,82 @@ uint32_t frame_number, meter_idle = kMeterIdle;
 int32_t stun_before[2];
 std::vector<uint8_t> meter[2];
 
+/* A frame of the fight's frame data and the meter (TrainingFrame, on the frames the fight stepped) */
+void FrameData(const bool hit[2])
+{
+    ++frame_number;
+    uint8_t cell[2];
+    bool free_now[2], contact[2];
+    for (int p = 0; p < 2; ++p) {
+        const uint32_t record = Record(p);
+        const bool busy = *recomp_memory(record + kBusy, 1u) != 0u;
+        const bool live = *recomp_memory(record + kAttackLive, 1u) != 0u;
+        const int32_t stun = *reinterpret_cast<const int32_t *>(recomp_memory(record + kHitStun, 4u));
+        const bool reeling = stun > 0 || *recomp_memory_u32(record + kReaction) != 0u ||
+            *recomp_memory(record + kGuardState, 1u) == kGuarding;
+        contact[p] = stun > stun_before[p] || hit[p];   /* (this fighter was hit or guarded) */
+        stun_before[p] = stun;
+        free_now[p] = !busy && !reeling;
+        const bool own = busy && !reeling;
+        cell[p] = live ? SC2_METER_ACTIVE
+            : own ? (move[p].on && move[p].first_live ? SC2_METER_RECOVERY : SC2_METER_STARTUP)
+            : reeling ? SC2_METER_STUN : SC2_METER_FREE;
+        Move &m = move[p];
+        if ((own || live) && !m.on) {
+            m = Move{};
+            m.on = true;
+            m.start = frame_number;
+        }
+        if (m.on && live) {
+            if (!m.first_live) m.first_live = frame_number;
+            m.last_live = frame_number;
+            ++m.live;
+        }
+        if (m.on && !own && !live) {
+            m.on = false;
+            if (m.first_live) {
+                Shown &out = shown[p];
+                out = Shown{};
+                out.valid = true;
+                out.startup = m.first_live - m.start + 1u;
+                out.active = m.live;
+                out.recovery = frame_number - 1u - m.last_live;
+                out.contact = m.contact;
+                out.hit = m.hit;
+            }
+        }
+    }
+    for (int p = 0; p < 2; ++p) {
+        /* (a contact during this fighter's move: the advantage counted from now until both are free) */
+        if (move[p].on && contact[1 - p]) {
+            move[p].contact = true;
+            move[p].hit = move[p].hit || hit[1 - p];
+            advantage[p] = Advantage{true, 0u, 0u};
+        }
+        Advantage &a = advantage[p];
+        if (!a.waiting) continue;
+        if (!a.attacker_free && free_now[p]) a.attacker_free = frame_number;
+        if (!a.defender_free && free_now[1 - p]) a.defender_free = frame_number;
+        if (a.attacker_free && a.defender_free) {
+            a.waiting = false;
+            shown[p].advantage_known = true;
+            shown[p].advantage = static_cast<int>(a.defender_free) - static_cast<int>(a.attacker_free);
+        }
+    }
+    const bool doing = cell[0] != SC2_METER_FREE || cell[1] != SC2_METER_FREE;
+    if (doing && meter_idle >= kMeterIdle) {
+        meter[0].clear();
+        meter[1].clear();
+    }
+    meter_idle = doing ? 0u : meter_idle + 1u;
+    if (doing || meter_idle <= kMeterTail) {
+        for (int p = 0; p < 2; ++p) {
+            meter[p].push_back(cell[p]);
+            if (meter[p].size() > SC2_PANEL_METER) meter[p].erase(meter[p].begin());
+        }
+    }
+}
+
 /* --- the endless battle --- */
 
 uint32_t control_before[2];      /* (who played each fighter before: given back after; 0 none taken) */
@@ -407,78 +483,12 @@ void TrainingFrame()
         health_before[p] = health;
         reacting_before[p] = Reacting(p);
     }
-    /* Frame data and the meter */
-    ++frame_number;
-    uint8_t cell[2];
-    bool free_now[2], contact[2];
-    for (int p = 0; p < 2; ++p) {
-        const uint32_t record = Record(p);
-        const bool busy = *recomp_memory(record + kBusy, 1u) != 0u;
-        const bool live = *recomp_memory(record + kAttackLive, 1u) != 0u;
-        const int32_t stun = *reinterpret_cast<const int32_t *>(recomp_memory(record + kHitStun, 4u));
-        const bool reeling = stun > 0 || *recomp_memory_u32(record + kReaction) != 0u ||
-            *recomp_memory(record + kGuardState, 1u) == kGuarding;
-        contact[p] = stun > stun_before[p] || hit[p];   /* (this fighter was hit or guarded) */
-        stun_before[p] = stun;
-        free_now[p] = !busy && !reeling;
-        const bool own = busy && !reeling;
-        cell[p] = live ? SC2_METER_ACTIVE
-            : own ? (move[p].on && move[p].first_live ? SC2_METER_RECOVERY : SC2_METER_STARTUP)
-            : reeling ? SC2_METER_STUN : SC2_METER_FREE;
-        Move &m = move[p];
-        if ((own || live) && !m.on) {
-            m = Move{};
-            m.on = true;
-            m.start = frame_number;
-        }
-        if (m.on && live) {
-            if (!m.first_live) m.first_live = frame_number;
-            m.last_live = frame_number;
-            ++m.live;
-        }
-        if (m.on && !own && !live) {
-            m.on = false;
-            if (m.first_live) {
-                Shown &out = shown[p];
-                out = Shown{};
-                out.valid = true;
-                out.startup = m.first_live - m.start + 1u;
-                out.active = m.live;
-                out.recovery = frame_number - 1u - m.last_live;
-                out.contact = m.contact;
-                out.hit = m.hit;
-            }
-        }
-    }
-    for (int p = 0; p < 2; ++p) {
-        /* (a contact during this fighter's move: the advantage counted from now until both are free) */
-        if (move[p].on && contact[1 - p]) {
-            move[p].contact = true;
-            move[p].hit = move[p].hit || hit[1 - p];
-            advantage[p] = Advantage{true, 0u, 0u};
-        }
-        Advantage &a = advantage[p];
-        if (!a.waiting) continue;
-        if (!a.attacker_free && free_now[p]) a.attacker_free = frame_number;
-        if (!a.defender_free && free_now[1 - p]) a.defender_free = frame_number;
-        if (a.attacker_free && a.defender_free) {
-            a.waiting = false;
-            shown[p].advantage_known = true;
-            shown[p].advantage = static_cast<int>(a.defender_free) - static_cast<int>(a.attacker_free);
-        }
-    }
-    const bool doing = cell[0] != SC2_METER_FREE || cell[1] != SC2_METER_FREE;
-    if (doing && meter_idle >= kMeterIdle) {
-        meter[0].clear();
-        meter[1].clear();
-    }
-    meter_idle = doing ? 0u : meter_idle + 1u;
-    if (doing || meter_idle <= kMeterTail) {
-        for (int p = 0; p < 2; ++p) {
-            meter[p].push_back(cell[p]);
-            if (meter[p].size() > SC2_PANEL_METER) meter[p].erase(meter[p].begin());
-        }
-    }
+    /* Frame data and the meter, on the frames the fight stepped: the game's own pause (Start) holds the fighters
+       as they are, and frames counted then would run the meter on and lengthen the move's numbers */
+    static uint32_t steps_seen;
+    const bool stepped = sc2_fight_steps != steps_seen;
+    steps_seen = sc2_fight_steps;
+    if (stepped) FrameData(hit);
 
     Endless(training.endless, frame_number);
 

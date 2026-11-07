@@ -7,6 +7,7 @@
 #include "kernel_abi.h"
 #include "program_manual.h"
 #include "sc2_guest.h"
+#include "sc2_fighter.h"
 #include "sc2_version.h"
 #include "scene_freeze_adapter.h"
 
@@ -72,6 +73,7 @@ static void memory_move(void)
     recomp_runtime.registers.eax = to;
     recomp_runtime.registers.esp += 4u;   /* the original's ret (cdecl: the caller pops the arguments) */
 }
+extern void sub_0004A090(void);
 /* rand (0x145A40). Online, the calls from 0x140730 and 0x141840 (sound and effects, run as often as the host's
    audio and timing have them, so not as often on both machines) draw from a state of their own, so that the
    game's numbers stay alike on both. */
@@ -734,6 +736,18 @@ static void box_frame(void)
     sub_0002EC90();
 }
 
+/* 0x4A090, the fight step (the fighters' collisions and updates, once a frame of a fight): counted, so training
+   can tell a frame the fight moved on from one the game's own pause (Start) held (sc2_training.cpp). It is called
+   on every frame of a fight, paused too: the pause holds both fighters (the byte at +4 of each record), and the step
+   then returns at once. Only a step with neither held is counted. */
+uint32_t sc2_fight_steps;
+static void fight_step(void)
+{
+    if (*recomp_memory(SC2_FIGHTER_RECORD + 4u, 1u) == 0u &&
+        *recomp_memory(SC2_FIGHTER_RECORD + SC2_FIGHTER_STRIDE + 4u, 1u) == 0u) ++sc2_fight_steps;
+    sub_0004A090();
+}
+
 /* 0x32630, the frame routine's (0x2DD40) first call: the start of a frame (sc2_frame.cpp).
    The game counts vertical blanks at 0x373F58 in its vblank callback (0x2DA40, given to D3D by 0x14F9F0), which the
    Xbox's GPU interrupt ran; nothing here runs it, so the count stayed 0. It is the clock of the Records' total play
@@ -941,6 +955,7 @@ RecompFunction recomp_sc2_hooks_lookup_manual(uint32_t address)
     case 0x000344d0u: return data_region;
     case 0x0002a350u: return leave_for_dashboard;
     case 0x000de480u: return arcade_ending;
+    case 0x0004a090u: return fight_step;
     default: break;
     }
     const RecompFunction items = sc2_guest_items_lookup(address);

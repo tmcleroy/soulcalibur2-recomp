@@ -10,6 +10,7 @@
 
 # --- code: shape-only matches, confirmed by callers or by identical shape at the same distance
 0x00044360 0x000451a0   # weapon bones setter: 1 caller agrees; differs only by fighter-record offsets (+0x20)
+0x0004a090 0x0004af30   # the fight step (sc2_hooks.c fight_step): a 0.84 shape match; its 1 caller agrees
 0x00047a0e 0x0004884e   # return address after the fighter setup's call to 0x44360 (PAL call at 0x48849)
 0x0004fef0 0x00050f10   # first logo scene's update: the next one (0x50190) is an exact match at 0x511c0
 0x000d24f0 0x000d5cc0   # 3 callers agree

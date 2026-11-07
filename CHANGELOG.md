@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- **The frame meter holds while paused** ([#37](https://github.com/tmcleroy/soulcalibur2-recomp/issues/37)): with
+  Frame data on, pausing (Start) in the middle of a move kept the meter running, and the move's startup, active or
+  recovery frames came out longer by the time spent paused. The meter and the numbers now count only frames the
+  fight moved on.
 - **No spinning card on the stage select**: with the guests built, choosing the same fighter for both sides from
   the grid's right-hand column (Raphael twice in Practice, for one) left that fighter's grid card turning beside
   player 2's portrait on the stage select. It now slides off with the others as the grid closes.
