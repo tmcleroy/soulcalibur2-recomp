@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **Weapon swing sounds**: the whoosh of a swing is heard again. Its pitch moves every frame, and each change started
+  the sound over on silence, so it never played (on every system).
 - **Link's hair**: the locks framing his face are drawn again, fixing the dark gaps near his temples in character select and fights. The guests' file is rebuilt once.
 
 ## 0.3.0-beta.1
