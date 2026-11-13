@@ -1,5 +1,7 @@
 # Soulcalibur II Recomp
 
+**[Join me on Discord](https://discord.gg/FSC9GZ6nm)**
+
 [![License: GPL-3.0](https://img.shields.io/badge/license-GPL--3.0-blue)](LICENSE)
 
 ![Link against Heihachi on VS Battle's character select](docs/screenshots/select-link-heihachi.jpg)
