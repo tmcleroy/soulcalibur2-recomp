@@ -264,6 +264,7 @@
 0x00177984 0x0017cbf4 manual           # sc2_guest.cpp:80
 0x0017a390 0x0017f100 data             # sc2_guest.cpp:125
 0x0017a7c8 0x0017f538 manual           # sc2_guest.cpp:124
+0x0017d388 0x00181e68 manual           # sc2_guest.cpp:143
 0x0017f318 0x00183e1c data             # sc2_wm_select.c:33
 0x00188dc4 0x0018d690 manual           # sc2_wm_select.c:34
 0x00188eb0 0x0018d75c data-between     # sc2_wm_select.c:131

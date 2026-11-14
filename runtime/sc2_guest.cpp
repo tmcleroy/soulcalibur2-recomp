@@ -135,6 +135,26 @@ constexpr uint32_t kUiEntries = SC2_PAL ? 585u : 516u;
 constexpr uint32_t Ui(uint32_t us) { return SC2_PAL && us >= 88u ? us - 1u : us; }
 constexpr uint32_t kFirstNewLarge = SC2_PAL ? 154u : 148u;   /* the large icons roster.py appends */
 
+/* A weapon's parts as the Extra modes' weapon choice shows it (0x84F40, from 0x47DB0, the shown weapon's drawing): by
+   character, {count, pointer} at 0x17D388, each part a joint (u32) then its offset and rotation (3 floats each). The
+   Xbox's table has none for 27 and 28, so the guests' weapons were never placed there and did not show. Their own
+   are their programs' (each program's table has its guest's row): Link's two (sword, shield) at 0x802518CC on the
+   GameCube (big-endian there), Heihachi's two (his gauntlets) at 0x490960 on the PS2. */
+constexpr uint32_t kWeaponParts = 0x0017d388u;
+struct WeaponPart {
+    uint32_t joint;
+    float place[6];
+};
+static_assert(sizeof(WeaponPart) == 0x1c, "a weapon part is 0x1c bytes");
+const WeaponPart kLinkWeaponParts[2] = {
+    {0u, {-0.249056771f, -0.458585054f, -0.0500000007f, 0.249999955f, 0.0f, 0.249999955f}},
+    {0u, {0.15094322f, 0.00999999978f, 0.00999999978f, 0.0f, -0.249999955f, 0.0f}},
+};
+const WeaponPart kHeihachiWeaponParts[2] = {
+    {0u, {0.0934636369f, 0.0199999996f, -0.100000001f, -0.250206202f, -0.078572087f, -0.252249748f}},
+    {0u, {-0.0664619505f, -0.0299999993f, 0.100000001f, 0.339396f, -0.136986092f, -0.299951851f}},
+};
+
 /* Link and Heihachi: their blocks (roster.py) and the fifth column's top two cells. */
 const RosterGuest kRoster[2] = {{27, 24, 4, 4}, {28, 25, 9, 2}};
 
@@ -314,6 +334,15 @@ bool ApplyGuestRoster(const char *path)
         Put<uint8_t>(kCellOf + uint32_t(guest.character), uint8_t(guest.cell));
         small += uint32_t(guest.costumes);
         large += uint32_t(guest.costumes);
+        {
+            const WeaponPart *parts = guest.character == 27 ? kLinkWeaponParts : kHeihachiWeaponParts;
+            const uint32_t at = recomp_kernel_allocate_pool(uint32_t(2u * sizeof(WeaponPart)));
+            if (at) {
+                std::memcpy(recomp_memory(at, 2u * sizeof(WeaponPart)), parts, 2u * sizeof(WeaponPart));
+                Put<int32_t>(kWeaponParts + 8u * uint32_t(guest.character), 2);
+                Put<uint32_t>(kWeaponParts + 8u * uint32_t(guest.character) + 4u, at);
+            }
+        }
         if (guest.character == 27) g_roster_link = true;
         if (guest.cell % 5 == 4) g_roster_column = true;
         /* The Arcade ending (0xDE480): its row in the table by character (0x34ED88: the /2 entry of its picture,

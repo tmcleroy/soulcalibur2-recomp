@@ -471,3 +471,13 @@ changes, from the bytes of both discs and both programs:
 Each release's file is its own (`guests-root.olk`, `guests-root-europe.olk` on the Guest page). The program
 leaves out a file built from the other release's disc (`GuestFileMatches`: its /2 count) and plays without
 guests.
+
+## Their weapons on the Extra modes' weapon choice (2026-11-14)
+
+The weapon choice (after a character in the Extra modes) shows the chosen weapon alone, turning. Its drawing
+(0x47DB0, the shown weapon from 0x47FB0) places the weapon's parts with 0x84F40, by character: {count, pointer} at
+0x17D388 (PAL 0x181E68), each part a joint (u32), an offset and a rotation (3 floats each). The Xbox's table has
+none for 27 and 28, so the guests' weapons were drawn with their parts never placed and did not show (both discs,
+both guests). Each guest's own program has its row: Link's two parts at 0x802518CC on the GameCube (its table's row
+27), Heihachi's two at 0x490960 on the PS2 (row 28). `runtime/sc2_guest.cpp` (`kWeaponParts`) puts them in the
+table when the guests load. Fights did not need them.

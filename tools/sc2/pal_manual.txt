@@ -26,6 +26,7 @@
 
 # --- data no instruction names: by their bytes (64 of 64 alike) or by the pointer that holds them
 0x00177950 0x0017cbc0   # Spawn's strings, 0x177950-0x17798b: all 0x5270 later, bytes alike
+0x0017d388 0x00181e68   # weapon parts by character (sc2_guest.cpp, kWeaponParts): the same 34 rows, each pointing at the same records, 0x4ae0 later
 0x00177954 0x0017cbc4
 0x00177968 0x0017cbd8
 0x00177970 0x0017cbe0
