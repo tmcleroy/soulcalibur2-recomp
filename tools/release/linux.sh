@@ -13,11 +13,19 @@ export SC2_SRC_DIR=build/src-linux SC2_RUNNER_DIR=build/linux-runner SC2_LAUNCHE
 # (the program finds the SDL3 beside it)
 export SC2_CMAKE_ARGS="-DRECOMP_FETCH_SDL3=ON -DCMAKE_BUILD_WITH_INSTALL_RPATH=ON -DCMAKE_INSTALL_RPATH=\$ORIGIN"
 python3 "$root/tools/build_game.py" build
+# the European disc's program, which the US one hands a European disc to (runner.cpp handToOtherRelease, #60): its
+# lift (private/program-pal) is made on the Mac first too, from the European disc (tools/build_game.py --pal lift)
+if [ ! -d "$root/private/program-pal" ]; then
+    echo "private/program-pal is missing: lift the European disc first (tools/build_game.py --pal lift)" >&2
+    exit 1
+fi
+python3 "$root/tools/build_game.py" --pal build
 python3 "$root/tools/build_game.py" launcher
 rm -rf "$out"
 mkdir -p "$out/Soulcalibur2Recomp"
 pkg="$out/Soulcalibur2Recomp"
 cp "$root/build/linux-runner/recomp_program_runner" "$pkg/soulcalibur2"
+cp "$root/build/linux-runner-pal/recomp_program_runner" "$pkg/soulcalibur2-pal"
 cp "$root/build/linux-launcher/soulcalibur2-launcher" "$pkg/"
 # the runtime's shared SDL3, found beside the program
 # (as its soname, a plain file: the launcher's updates list files, not links)

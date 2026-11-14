@@ -12,10 +12,18 @@ out="$root/build/release-windows"
 export SC2_SRC_DIR=build/src-windows SC2_RUNNER_DIR=build/windows-runner SC2_LAUNCHER_DIR=build/windows-launcher
 export SC2_CMAKE_ARGS="-DCMAKE_TOOLCHAIN_FILE=$root/tools/release/llvm-mingw.cmake -DRECOMP_WINDOWS_SDL_GPU=ON -DRECOMP_GAME_LIBS=ws2_32;iphlpapi"
 python3 "$root/tools/build_game.py" build
+# the European disc's program, which the US one hands a European disc to (runner.cpp handToOtherRelease, #60): its
+# lift (private/program-pal) is made on the Mac first too, from the European disc (tools/build_game.py --pal lift)
+if [ ! -d "$root/private/program-pal" ]; then
+    echo "private/program-pal is missing: lift the European disc first (tools/build_game.py --pal lift)" >&2
+    exit 1
+fi
+python3 "$root/tools/build_game.py" --pal build
 python3 "$root/tools/build_game.py" launcher
 pkg="$out/Soulcalibur2Recomp"
 rm -rf "$out" && mkdir -p "$pkg"
 cp "$root/build/windows-runner/recomp_program_runner.exe" "$pkg/soulcalibur2.exe"
+cp "$root/build/windows-runner-pal/recomp_program_runner.exe" "$pkg/soulcalibur2-pal.exe"
 cp "$root/build/windows-launcher/soulcalibur2-launcher.exe" "$pkg/"
 cp "$root"/build/windows-runner/*.dll "$pkg/" 2>/dev/null || true
 for dll in libc++.dll libunwind.dll; do cp "$LLVM_MINGW/x86_64-w64-mingw32/bin/$dll" "$pkg/"; done

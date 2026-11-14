@@ -27,7 +27,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 # Release scripts build elsewhere (tools/release/linux.sh): SC2_SRC_DIR, SC2_RUNNER_DIR, SC2_LAUNCHER_DIR and extra
-# CMake arguments in SC2_CMAKE_ARGS (space separated).
+# CMake arguments in SC2_CMAKE_ARGS (space separated). With --pal, "-pal" is added to SC2_SRC_DIR and SC2_RUNNER_DIR, so
+# a release's two programs build side by side.
 EXTRA_CMAKE = os.environ.get("SC2_CMAKE_ARGS", "").split()
 LIFTER = ROOT / "tools/xboxrecomp"
 SHARED = ROOT / "third_party/doa2u-re"
@@ -54,6 +55,14 @@ def runtime_own():
     if PAL and RUNTIME_OWN == ROOT / "runtime":
         RUNTIME_OWN = pal_port.write_runtime(ROOT / (BUILD % "runtime"))
     return RUNTIME_OWN
+
+
+def build_dir(variable, name):
+    """A build folder: the release script's (SC2_SRC_DIR, SC2_RUNNER_DIR; "-pal" added for --pal) or build/<name>."""
+    given = os.environ.get(variable)
+    if given:
+        return ROOT / (given.rstrip("/") + ("-pal" if PAL else ""))
+    return ROOT / (BUILD % name)
 PYTHON = PRIVATE / "venv/bin/python"
 # runtime/ files with no shared counterpart, built into the runner.
 GAME_SOURCES = ["sc2_hooks.c", "sc2_settings.cpp", "sc2_input.cpp", "sc2_menu.cpp", "sc2_training.cpp", "sc2_guest.cpp", "sc2_netplay.cpp", "sc2_state.cpp", "sc2_frame.cpp", "sc2_wm_select.c", "sc2_android.cpp", "sc2_touch.cpp", "x87_math/sin.c", "x87_math/cos.c", "x87_math/__sin.c", "x87_math/__cos.c", "x87_math/__rem_pio2.c", "x87_math/__rem_pio2_large.c", "x87_math/atan.c", "x87_math/atan2.c", "x87_math/log2.c", "x87_math/log2_data.c", "x87_math/expm1.c", "../recomp-common/launcher/src/online.cpp", "../recomp-common/launcher/src/run_program.cpp", "../recomp-common/menu.cpp", "../recomp-common/settings.cpp"]
@@ -147,7 +156,7 @@ def lift():
 
 def merge():
     """build/src/recomp-runtime: shared files linked, runtime/ files replacing them."""
-    src = ROOT / os.environ.get("SC2_SRC_DIR", BUILD % "src")
+    src = build_dir("SC2_SRC_DIR", "src")
     if src.exists():
         shutil.rmtree(src)
     runtime = src / "recomp-runtime"
@@ -177,7 +186,7 @@ def build():
     if manual_list()[1] != receipt.get("manual_sha256"):
         sys.exit("runtime/ binds a different set of functions than the last lift; lift again")
     runtime = merge()
-    out = ROOT / os.environ.get("SC2_RUNNER_DIR", BUILD % "runner")
+    out = build_dir("SC2_RUNNER_DIR", "runner")
     logs = PRIVATE / ("logs-pal" if PAL else "logs")
     run(["cmake", "-S", runtime, "-B", out, "-G", "Ninja", "-DCMAKE_BUILD_TYPE=Release", *EXTRA_CMAKE,
          "-DRECOMP_PROGRAM_DIR=%s" % (PROGRAM / "generated"),
