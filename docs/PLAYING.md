@@ -185,6 +185,9 @@ Soulcalibur II had a different guest on each console. With the discs you own, th
 - **Link**, from Soulcalibur II (USA) for the GameCube (`.iso`, `.gcm` or `.ciso`);
 - **Heihachi**, from Soulcalibur II (USA) for the PlayStation 2 (`.iso`).
 
+They join either Xbox disc, the USA or the European one (in any of its languages). The Guest page builds them for the
+disc chosen on the Game page; with both discs, build once with each.
+
 Press **Rebuild** after changing discs. The guests then stand in the select screen's right-hand column beside Spawn
 (Link above Heihachi) with their models and outfits, moves, weapons (in the Extra modes, as Spawn's are had),
 voices, select-screen art and their own Arcade endings. In **Weapon Master** they are in a column to the right of

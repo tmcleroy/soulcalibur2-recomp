@@ -1316,6 +1316,8 @@ int main(int argc, char **argv)
     }
     recomp_disc_root_path = discRoot.c_str();
     if (!storageRoot.empty()) recomp_storage_root_path = storageRoot.c_str();
+    /* (a guests' file built from the other release's disc is left out: the game reads its menus by this disc's numbers) */
+    if (!guests.empty() && !sc2::GuestFileMatches(guests.c_str())) guests.clear();
     if (!guests.empty()) discFiles.push_back("root.olk=" + guests);
     else if (!guestLink.empty()) discFiles.push_back("root.olk=" + guestLink);
     else if (!guestHeihachi.empty()) discFiles.push_back("root.olk=" + guestHeihachi);

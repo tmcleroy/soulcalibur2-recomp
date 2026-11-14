@@ -447,3 +447,27 @@ against the Xbox's. For the shared characters, group 2: 0 of 394 facing the
 Xbox's way before, 394 of 394 after; groups 0 and 1 unchanged (840 of 840 in
 group 1; in group 0, 654 of 257,368 are reversed, as before). Guest cache
 version 3 rebuilds older files.
+
+## With the European Xbox disc (2026-11-14)
+
+The European disc (Europe, Australia) takes the guests too, from the same USA GameCube and PS2 discs. What it
+changes, from the bytes of both discs and both programs:
+
+- **/2 (menus, pictures, text): 585 entries to the US disc's 516.** 0-87 are the same; 88-91 hold the Arcade
+  endings' text in French, Italian, German and Spanish (each the English 87's 88 strings, the guests' at 77-84
+  as there) where the US disc has 88-94 empty; every entry from the US disc's 95 on is one lower (the guests'
+  places 84/85, 145/146, 177/178, 283/284, 344/345, 421/422, 469-473 are empty, as theirs are on the US disc). The
+  last 69 are the other languages' weapon names, profile texts and pictures. `guest/build.cpp`'s `Layout`
+  (and `tools/guests/roster.py`'s) maps the US numbers; the guest discs keep theirs.
+- **Large select-grid icons (/2/10 part 0): 154 to 148.** Six more come before the characters', so every
+  character's large icon is 6 higher (Spawn's 106 and 107); /2/9 is unchanged. The guests' are appended at 154
+  (`runtime/sc2_guest.cpp`, `kFirstNewLarge`).
+- **The program's tables are the same:** profiles, block starts, second-costume flags, what each mode allows,
+  the select grid (but for those icons), each character's cell, the items and the Arcade endings (their text
+  numbers index the chosen language's entry). The Art Gallery's picture numbers are each one lower, as /2's.
+- **/4 (characters)** has the same blocks; the movesets (slots 28-29) are a later build (July 2003 to the US
+  disc's June) and Link's and Heihachi's US movesets play in it.
+
+Each release's file is its own (`guests-root.olk`, `guests-root-europe.olk` on the Guest page). The program
+leaves out a file built from the other release's disc (`GuestFileMatches`: its /2 count) and plays without
+guests.

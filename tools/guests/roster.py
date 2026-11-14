@@ -145,6 +145,24 @@ LINK_UI = [(86, 84), (148, 146), (180, 178), (286, 284), (424, 422), (475, 470),
 HEIHACHI_UI = [(86, 85), (148, 147), (180, 179), (286, 285), (424, 423), (475, 473), (476, 474), (343, 346)]
 
 
+class Layout:
+    """The Xbox disc's /2, as the US disc numbers it or the European one (Europe, Australia: 585 entries to the US
+    disc's 516). The European disc has the same entries up to 87, then the Arcade endings' text in its four other
+    languages where the US disc has empty entries, so every entry from the US disc's 95 on is one lower; its other
+    languages' text and pictures follow the US disc's last entry. Its large select-grid icons (/2/10 part 0) are 6
+    more, before the characters'; /2/9 is as the US disc's. (guest/build.cpp, Layout, the same)"""
+    def __init__(self, x2):
+        self.european = x2.count == 585
+        if not self.european and x2.count != 516:
+            sys.exit("the Xbox disc's menus are not Soulcalibur II's (USA or Europe)")
+
+    def ui(self, us):
+        return us - 1 if self.european and us >= 88 else us
+
+    def large(self, us):
+        return us + 6 if self.european else us
+
+
 def _flags(vxt, k):
     """Texture k's entry flags (the second word of its table entry)."""
     stride = 0x24 if vxt[4] == 2 else 0x20
@@ -155,6 +173,7 @@ def build_roster(xbox_path, gc_path, ps2_path, output):
     xroot = Olnk.open(xbox_path)
     top, top_times = xroot.entries()
     x4, x2 = xroot.child(4), xroot.child(2)
+    layout = Layout(x2)
     e4, t4 = x4.entries()
     e2, t2 = x2.entries()
     e4 = e4 + [None] * 78
@@ -163,7 +182,8 @@ def build_roster(xbox_path, gc_path, ps2_path, output):
     # The Art Gallery's thumbnails (runtime/sc2_guest.cpp, the gallery's slots): Hi-Res's (/2/395) gets Link's
     # portrait, then Heihachi's and his two illustrations (Illustrations has room for three only); Illustrations'
     # (/2/396) gets Link's three. Each from the guest slot's textures on its disc.
-    hires, illus = x2.bytes(395), x2.bytes(396)
+    hires_entry, illus_entry = layout.ui(395), layout.ui(396)
+    hires, illus = x2.bytes(hires_entry), x2.bytes(illus_entry)
     hires_new, illus_new = [], []
     small, large9, large10 = icons_x[2], x2.bytes(9), pack_parts(x2.bytes(10))
     small_new, large9_new, large10_new = [], [], []
@@ -175,14 +195,14 @@ def build_roster(xbox_path, gc_path, ps2_path, output):
         program = Dol(_program(gc_path, GAMECUBE[0]))
         block[38] = profile(program, *GAMECUBE[1:], LINK)
         e4[block_start(LINK):block_start(LINK) + 39] = block
-        ui = build_guest.guest_ui(x2, g2)
+        ui = build_guest.guest_ui(x2, g2, layout.ui)
         for spawn, own in LINK_UI:
-            e2[own] = ui[spawn]
+            e2[layout.ui(own)] = ui[spawn]
         gicons, g9, g10 = pack_parts(g2.bytes(5), True)[2], g2.bytes(9), pack_parts(g2.bytes(10), True)[0]
         for k in range(4):
             small_new.append((_flags(small, 51),) + textures.c8_texture(gicons, 51 + k))
             large9_new.append((_flags(large9, 98),) + textures.c8_texture(g9, 98 + k))
-            large10_new.append((_flags(large10[0], 100),) + textures.c8_texture(g10, 100 + k))
+            large10_new.append((_flags(large10[0], layout.large(100)),) + textures.c8_texture(g10, 100 + k))
         hires_new.append((_flags(hires, 20),) + textures.c8_texture(g2.bytes(395), 20))
         for k in (20, 35, 41):
             illus_new.append((_flags(illus, k),) + textures.c8_texture(g2.bytes(396), k))
@@ -194,25 +214,25 @@ def build_roster(xbox_path, gc_path, ps2_path, output):
         program = Elf(_program(ps2_path, PS2[0]))
         block[38] = profile(program, *PS2[1:], HEIHACHI)
         e4[block_start(HEIHACHI):block_start(HEIHACHI) + 39] = block
-        work = list(e2)
-        build_guest.heihachi_ui(x2, p2, work)
+        work = list(e2)   # (scratch: Heihachi's entries at the US disc's indexes)
+        build_guest.heihachi_ui_entries(x2, p2, work, layout.ui)
         for spawn, own in HEIHACHI_UI:
-            e2[own] = work[spawn]
+            e2[layout.ui(own)] = work[spawn]
         picons, p9, p10 = (ps2tex.Bank(pack_parts(p2.bytes(5))[2]), ps2tex.Bank(p2.bytes(9)),
                            ps2tex.Bank(pack_parts(p2.bytes(10))[0]))
         for k in range(2):
             small_new.append((_flags(small, 51),) + picons.texture(51 + k).paletted())
             large9_new.append((_flags(large9, 98),) + p9.texture(98 + k).paletted())
-            large10_new.append((_flags(large10[0], 100),) + p10.texture(100 + k).paletted())
+            large10_new.append((_flags(large10[0], layout.large(100)),) + p10.texture(100 + k).paletted())
         p395, p396 = ps2tex.Bank(p2.bytes(395)), ps2tex.Bank(p2.bytes(396))
         hires_new.append((_flags(hires, 20),) + p395.texture(20).paletted())
         for k in (20, 35):
             hires_new.append((_flags(hires, 20),) + p396.texture(k).paletted())
 
     if hires_new:
-        e2[395] = textures.append_p8(hires, hires_new)
+        e2[hires_entry] = textures.append_p8(hires, hires_new)
     if illus_new:
-        e2[396] = textures.append_p8(illus, illus_new)
+        e2[illus_entry] = textures.append_p8(illus, illus_new)
     icons_x[2] = textures.append_p8(small, small_new)
     e2[5] = build_pack(icons_x, alignment=pack_alignment(x2.bytes(5)))
     e2[9] = textures.append_p8(large9, large9_new)
