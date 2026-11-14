@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // The Guest page: the other versions' guests beside Spawn. Link is built from the player's GameCube disc and
 // Heihachi from their PlayStation 2 disc (guest/build.h, build_guests_root), into one file in the player's folder
-// (guest/guests-root.olk) that the game reads in place of the Xbox disc's root.olk (--guests): they then stand
-// in the select grid's fifth column. The discs are only read (on Android, copied into the app's folder first: the
+// (guest/guests-root.olk, or guest/guests-root-europe.olk from the European Xbox disc, whose menus are numbered
+// otherwise) that the game reads in place of the Xbox disc's root.olk (--guests): they then stand in the select
+// grid's fifth column. The discs are only read (on Android, copied into the app's folder first: the
 // system's picker gives documents, not files).
 
 #include "guest_page.h"
@@ -45,7 +46,8 @@ struct Guest {
     const char *disc;       // what the disc is, for the page
 };
 const std::array<Guest, 2> kGuests = {{{"Link", "GameCube"}, {"Heihachi", "PlayStation 2"}}};
-constexpr const char *kBuilt = "guests-root.olk";   // what is built, in the player's folder
+// what is built, in the player's folder: one for each release's Xbox disc (guest/build.cpp, Layout)
+constexpr const char *kBuilt = "guests-root.olk", *kBuiltEurope = "guests-root-europe.olk";
 const char *disc_key(int guest) { return guest == 0 ? "gamecube" : "ps2"; }
 
 struct State {
@@ -68,7 +70,9 @@ State &state() {
     return s;
 }
 
-std::filesystem::path built_file(const std::filesystem::path &folder) { return folder / "guest" / kBuilt; }
+std::filesystem::path built_file(const std::filesystem::path &folder, bool european) {
+    return folder / "guest" / (european ? kBuiltEurope : kBuilt);
+}
 
 bool is_file(const std::filesystem::path &path) {
     std::error_code error;
@@ -232,7 +236,9 @@ void GuestPage(launcher::PageContext &page) {
                     page.width);
 
     const std::string game_file = page.prefs.get("game", "disc");
-    const bool built = is_file(built_file(page.folder));
+    const bool european = IsEuropeanDisc(game_file);
+    const std::filesystem::path output = built_file(page.folder, european);
+    const bool built = is_file(output);
     std::string discs[2];
     for (int g = 0; g < 2; ++g) discs[g] = page.prefs.get("guest", disc_key(g));
 
@@ -262,34 +268,27 @@ void GuestPage(launcher::PageContext &page) {
         if (s.copying) status = "Copying the disc you chose into the app's folder…";
         else if (s.building) status = "Converting…";
         else if (!s.error.empty()) status = "It could not be built: " + s.error;
-        else if (built && guest::guests_version(built_file(page.folder).u8string()) != guest::GUESTS_VERSION)
+        else if (built && guest::guests_version(output.u8string()) != guest::GUESTS_VERSION)
             status = "Built by an earlier release: press Rebuild. Until then the guests may lack what this release "
                      "adds, and online play needs both players' guests built by the same release.";
         else if (built) status = "Built from your discs: the guests stand in the select grid's right-hand column. "
                                  "Rebuild after changing discs.";
         else status = "Not built yet.";
     }
-    /* (the guests are made from the US disc's root.olk: the European one's menus and their pictures and text are
-       laid out otherwise, 585 entries in /2 to the US disc's 516, which the builder doesn't know yet) */
-    const bool european = IsEuropeanDisc(game_file);
-    const bool can_build = (!discs[0].empty() || !discs[1].empty()) && !game_file.empty() && !european &&
-                           !s.building && !page.playing;
+    const bool can_build = (!discs[0].empty() || !discs[1].empty()) && !game_file.empty() && !s.building &&
+                           !page.playing;
     row(page.width, "The guests", status.c_str(), 130, 36, [&] {
         if (s.building) {
             ui::progress_bar(ImGui::GetID("guest_progress"), float(s.done) / float(std::max(1, int(s.total))), px(130),
                              px(8));
         } else if (ui::button(built ? "Rebuild##guests" : "Build##guests", Kind::Primary, 130.0f, can_build)) {
-            start_build(xbox_source(game_file), discs, built_file(page.folder));
+            start_build(xbox_source(game_file), discs, output);
         }
     });
     card.end();
     if (game_file.empty()) {
         ui::gap(10);
         ui::text("Choose your Xbox disc on the Game page first.", ui::Font::Regular, ui::size::kDetail, p.secondary);
-    } else if (european) {
-        ui::gap(10);
-        ui::text("The guests come with the US Xbox disc only, for now: the European disc's menus are laid out "
-                 "differently.", ui::Font::Regular, ui::size::kDetail, p.secondary);
     }
 }
 
@@ -303,8 +302,12 @@ bool GuestBusy() {
 
 launcher::Notice GuestNotice(const std::filesystem::path &folder) {
     if (state().building || state().copying) return {};
-    const std::filesystem::path file = built_file(folder);
-    if (!is_file(file) || guest::guests_version(file.u8string()) == guest::GUESTS_VERSION) return {};
+    bool earlier = false;   // (either release's file)
+    for (bool european : {false, true}) {
+        const std::filesystem::path file = built_file(folder, european);
+        earlier = earlier || (is_file(file) && guest::guests_version(file.u8string()) != guest::GUESTS_VERSION);
+    }
+    if (!earlier) return {};
     return {"REBUILD NEEDED", "Rebuild the guests",
             "Link and Heihachi were built by an earlier release. Rebuild them on the Guest page to get this release's "
             "fixes; online play also needs both players' guests built by the same release.",
@@ -312,7 +315,7 @@ launcher::Notice GuestNotice(const std::filesystem::path &folder) {
 }
 
 std::vector<std::string> GuestArguments(const std::filesystem::path &folder, const std::string &game_file) {
-    const std::filesystem::path file = built_file(folder);
-    if (!is_file(file) || IsEuropeanDisc(game_file)) return {};
+    const std::filesystem::path file = built_file(folder, IsEuropeanDisc(game_file));
+    if (!is_file(file)) return {};
     return {"--guests", file.u8string()};
 }

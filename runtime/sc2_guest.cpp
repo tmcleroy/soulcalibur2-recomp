@@ -23,6 +23,7 @@
    weapons (0x800a1cc4), which is not done here. The PS2 has no case for
    Heihachi: the default is his. */
 #include "sc2_guest.h"
+#include "sc2_version.h"
 
 extern "C" {
 #include "runtime.h"
@@ -128,6 +129,12 @@ constexpr int kSpawn = 29;
 struct RosterGuest {
     int character, block, cell, costumes;
 };
+/* The guests' file's /2, as this program's disc numbers it (guest/build.cpp, Layout): the European disc's entries from
+   the US disc's 95 on are one lower, and its large select-grid icons (/2/10 part 0) 6 more. */
+constexpr uint32_t kUiEntries = SC2_PAL ? 585u : 516u;
+constexpr uint32_t Ui(uint32_t us) { return SC2_PAL && us >= 88u ? us - 1u : us; }
+constexpr uint32_t kFirstNewLarge = SC2_PAL ? 154u : 148u;   /* the large icons roster.py appends */
+
 /* Link and Heihachi: their blocks (roster.py) and the fifth column's top two cells. */
 const RosterGuest kRoster[2] = {{27, 24, 4, 4}, {28, 25, 9, 2}};
 
@@ -159,7 +166,7 @@ template <typename T> T Get(uint32_t address)
    of the picture). The guests' file appends their thumbnails (tools/guests/roster.py): to Hi-Res's bank (/2/395)
    Link's portrait (21), then Heihachi's and his two illustrations; to Illustrations' (/2/396) Link's three
    (43-45), in its three free slots. Their pictures are the file's /2/422-423 (portraits) and 470-474
-   (illustrations). Hi-Res then has more than its 5 x 4 (sc2_hooks.c makes it 5 x 5). */
+   (illustrations), as the US disc numbers them (Ui). Hi-Res then has more than its 5 x 4 (sc2_hooks.c makes it 5 x 5). */
 static void ApplyGallery(bool link, bool heihachi)
 {
     auto slot = [](int gallery, int at, int32_t thumbnail, int32_t picture) {
@@ -167,16 +174,16 @@ static void ApplyGallery(bool link, bool heihachi)
         std::memcpy(recomp_memory(kGallery + 8u * uint32_t(gallery * 45 + at), sizeof row), row, sizeof row);
     };
     int at = 20, thumbnail = 21;
-    if (link) slot(0, at++, thumbnail++, 422);
+    if (link) slot(0, at++, thumbnail++, int32_t(Ui(422)));
     if (heihachi) {
-        slot(0, at++, thumbnail++, 423);
-        slot(0, at++, thumbnail++, 473);
-        slot(0, at++, thumbnail++, 474);
+        slot(0, at++, thumbnail++, int32_t(Ui(423)));
+        slot(0, at++, thumbnail++, int32_t(Ui(473)));
+        slot(0, at++, thumbnail++, int32_t(Ui(474)));
     }
     g_hires_pictures = at;
     for (int rest = at; rest < 25 && at > 20; ++rest) slot(0, rest, -1, -1);
     if (link) {
-        for (int k = 0; k < 3; ++k) slot(1, 42 + k, 43 + k, 470 + k);
+        for (int k = 0; k < 3; ++k) slot(1, 42 + k, 43 + k, int32_t(Ui(470u + uint32_t(k))));
     }
 }
 
@@ -222,6 +229,21 @@ static void BalanceGrid()
     g_grid_balanced = true;
 }
 
+bool GuestFileMatches(const char *path)
+{
+    std::FILE *f = std::fopen(path, "rb");
+    if (!f) return false;
+    uint64_t ui;
+    uint32_t size, count = 0;
+    const bool read = Entry(f, 0, 2, ui, size) && std::fseek(f, long(ui), SEEK_SET) == 0 && std::fread(&count, 4, 1, f) == 1;
+    std::fclose(f);
+    if (read && count == kUiEntries) return true;
+    std::fprintf(stderr, "recomp sc2: the guests' file %s was built from %s, not this one: playing without the guests\n",
+                 path, !read ? "something else than a disc" : count == 585u ? "the European disc" : count == 516u ? "the US disc"
+                                                                       : "another disc");
+    return false;
+}
+
 bool ApplyGuestRoster(const char *path)
 {
     std::FILE *f = std::fopen(path, "rb");
@@ -239,7 +261,7 @@ bool ApplyGuestRoster(const char *path)
         for (int g = 0; g < 2; ++g) {
             uint64_t at;
             uint32_t length;
-            picture[g] = Entry(f, ui, 345u + uint32_t(g), at, length) && length != 0u;
+            picture[g] = Entry(f, ui, Ui(345u + uint32_t(g)), at, length) && length != 0u;
         }
     }
     for (int g = 0; ok && g < 2; ++g) {
@@ -254,7 +276,7 @@ bool ApplyGuestRoster(const char *path)
     std::fclose(f);
     if (!ok) return false;
 
-    uint32_t small = 75u, large = 148u;   /* the icons roster.py appends, Link's first */
+    uint32_t small = 75u, large = kFirstNewLarge;   /* the icons roster.py appends, Link's first */
     for (int g = 0; g < 2; ++g) {
         const RosterGuest &guest = kRoster[g];
         const std::vector<uint8_t> &p = profiles[g];

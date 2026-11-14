@@ -98,11 +98,12 @@ def guest_icons(x2, g2):
     return build_pack(xp, alignment=pack_alignment(x2.bytes(5)))
 
 
-def guest_ui(x2, g2):
-    """{Xbox /2 index: bytes} for the guest's UI entries."""
+def guest_ui(x2, g2, ui=lambda index: index):
+    """{Xbox /2 index: bytes} for the guest's UI entries, by the US disc's index; `ui` gives the Xbox disc's own
+    (roster.py, Layout: the European disc numbers them otherwise)."""
     out = {}
     for gi, xi, kind in GUEST_UI:
-        g, x = g2.bytes(gi), x2.bytes(xi)
+        g, x = g2.bytes(gi), x2.bytes(ui(xi))
         if kind == "sound":
             out[xi] = sound.convert_container(g)
         elif kind == "paletted":
@@ -284,9 +285,11 @@ HEIHACHI_TEXTURES = [(203, 0, 19, 19), (395, None, 20, 20), (396, None, 20, 20),
                      (9, None, 98, 98), (9, None, 99, 99), (10, 0, 100, 100), (10, 0, 101, 101)]   # silhouettes
 
 
-def heihachi_ui(x2, p2, entries):
+def heihachi_ui_entries(x2, p2, entries, ui=lambda index: index):
+    """Heihachi's UI entries in `entries`, at the US disc's index; `ui` gives the Xbox disc's own, whose entry each
+    takes its flags and alignment from (roster.py, Layout)."""
     for pi, xi, kind in HEIHACHI_UI:
-        p, x = p2.bytes(pi), x2.bytes(xi)
+        p, x = p2.bytes(pi), x2.bytes(ui(xi))
         if kind == "sound":
             entries[xi] = sound.convert_container(p)
         elif kind == "paletted":
@@ -303,6 +306,10 @@ def heihachi_ui(x2, p2, entries):
             images = [(0, *bank.texture(k).paletted()) for k in range(bank.count)]
             picture = _keep_flags(textures.paletted_bank(images), xp[0])
             entries[xi] = build_pack([_pad(picture, 0x800)] + list(pp[1:]), alignment=pack_alignment(x))
+
+
+def heihachi_ui(x2, p2, entries):
+    heihachi_ui_entries(x2, p2, entries)
     # the select grid's icons (/2/5 part 2)
     xp, pp = pack_parts(x2.bytes(5)), pack_parts(p2.bytes(5))
     icons = ps2tex.Bank(pp[2])

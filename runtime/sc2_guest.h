@@ -25,6 +25,11 @@ void ApplyGuestHeihachi();
    once the XBE is in memory. */
 bool ApplyGuestRoster(const char *path);
 
+/* Whether the guests' file at `path` was built from this program's release's disc (US or European: their menus are
+   numbered otherwise, guest/build.cpp's Layout). Says why on stderr when not; the game then reads the disc's own
+   root.olk, without the guests. */
+bool GuestFileMatches(const char *path);
+
 } // namespace sc2
 
 extern "C" {

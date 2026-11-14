@@ -24,6 +24,21 @@ namespace {
 
 constexpr uint32_t GUEST_BLOCK = 46 + 39 * 23;
 
+/* The Xbox disc's /2 (menus, their pictures and text), as the US disc numbers it, or the European one (Europe,
+   Australia: 585 entries to the US disc's 516). The European disc has the same entries up to 87, then the Arcade
+   endings' text in its four other languages where the US disc has empty entries (88-91, the US disc's 88-94
+   making 88-93), so every entry from the US disc's 95 on is one lower; its other languages' text and pictures
+   follow the US disc's last entry. Its large select-grid icons (/2/10 part 0) are 6 more, before the characters'
+   (Spawn's 100 and 101 are its 106 and 107); /2/9, the large icons' other bank, is as the US disc's. */
+struct Layout {
+    bool european = false;
+    explicit Layout(const Olnk &x2) : european(x2.count() == 585) {
+        if (!european && x2.count() != 516) throw Error("the Xbox disc's menus are not Soulcalibur II's (USA or Europe)");
+    }
+    uint32_t ui(uint32_t us) const { return european && us >= 88 ? us - 1 : us; }      /* a /2 entry */
+    uint32_t large(uint32_t us) const { return european ? us + 6 : us; }              /* a /2/10 part 0 icon */
+};
+
 struct UiEntry {
     uint32_t gc, xbox;
     enum { Profile, Sound, Paletted, Rgba8 } kind;
@@ -176,25 +191,33 @@ Bytes redirect(Bytes table, const GuestText &t)
 
 void apply_text(const Olnk &x2, std::vector<Bytes> &entries, const GuestText *table, size_t n);
 
-void guest_ui(const Olnk &x2, const Olnk &g2, std::vector<Bytes> &entries)
+/* Link's select-screen entries (GUEST_UI), each in its Xbox entry's place (as `layout` numbers it). */
+void guest_ui_entries(const Olnk &x2, const Olnk &g2, std::vector<Bytes> &entries, const Layout &layout)
 {
     for (const UiEntry &u : GUEST_UI) {
-        const Bytes g = g2.bytes(u.gc), x = x2.bytes(u.xbox);
+        const uint32_t xbox = layout.ui(u.xbox);
+        const Bytes g = g2.bytes(u.gc), x = x2.bytes(xbox);
         switch (u.kind) {
-        case UiEntry::Sound: entries.at(u.xbox) = convert_sound_container(g); break;
-        case UiEntry::Paletted: entries.at(u.xbox) = keep_flags(convert_paletted_bank(g), x); break;
-        case UiEntry::Rgba8: entries.at(u.xbox) = keep_flags(convert_rgba8_bank(g), x); break;
+        case UiEntry::Sound: entries.at(xbox) = convert_sound_container(g); break;
+        case UiEntry::Paletted: entries.at(xbox) = keep_flags(convert_paletted_bank(g), x); break;
+        case UiEntry::Rgba8: entries.at(xbox) = keep_flags(convert_rgba8_bank(g), x); break;
         case UiEntry::Profile: {
             const auto gp = parts_of(g, true), xp = parts_of(x, false);
             Bytes picture = keep_flags(convert_paletted_bank(gp.at(0)), xp.at(0));
             pad(picture, 0x800);
             std::vector<Bytes> parts = {picture};
             parts.insert(parts.end(), gp.begin() + 1, gp.end());
-            entries.at(u.xbox) = build_pack(parts, pack_alignment(x));
+            entries.at(xbox) = build_pack(parts, pack_alignment(x));
             break;
         }
         }
     }
+}
+
+/* Link in Spawn's place (the US disc only): his entries, icons, gallery pictures, name and text over Spawn's. */
+void guest_ui(const Olnk &x2, const Olnk &g2, std::vector<Bytes> &entries)
+{
+    guest_ui_entries(x2, g2, entries, Layout(x2));
     {
         const Bytes x5 = x2.bytes(5);
         auto xp = parts_of(x5, false);
@@ -326,15 +349,17 @@ std::vector<std::pair<uint32_t, Paletted>> paletted_images(Ps2Bank &bank)
     return images;
 }
 
-void heihachi_ui(const Olnk &x2, const Olnk &p2, std::vector<Bytes> &entries)
+/* Heihachi's select-screen entries (HEIHACHI_UI), each in its Xbox entry's place (as `layout` numbers it). */
+void heihachi_ui_entries(const Olnk &x2, const Olnk &p2, std::vector<Bytes> &entries, const Layout &layout)
 {
     for (const UiEntry &u : HEIHACHI_UI) {
-        const Bytes p = p2.bytes(u.gc), x = x2.bytes(u.xbox);
+        const uint32_t xbox = layout.ui(u.xbox);
+        const Bytes p = p2.bytes(u.gc), x = x2.bytes(xbox);
         switch (u.kind) {
-        case UiEntry::Sound: entries.at(u.xbox) = convert_sound_container(p); break;
+        case UiEntry::Sound: entries.at(xbox) = convert_sound_container(p); break;
         case UiEntry::Paletted: {
             Ps2Bank bank(p);
-            entries.at(u.xbox) = keep_flags(paletted_bank(paletted_images(bank)), x);
+            entries.at(xbox) = keep_flags(paletted_bank(paletted_images(bank)), x);
             break;
         }
         case UiEntry::Rgba8: {
@@ -344,7 +369,7 @@ void heihachi_ui(const Olnk &x2, const Olnk &p2, std::vector<Bytes> &entries)
                 const Ps2Texture t = bank.texture(k);
                 images.push_back({0, t.width, t.height, t.rows()});
             }
-            entries.at(u.xbox) = keep_flags(rgba8_bank(images), x);
+            entries.at(xbox) = keep_flags(rgba8_bank(images), x);
             break;
         }
         case UiEntry::Profile: {
@@ -354,11 +379,17 @@ void heihachi_ui(const Olnk &x2, const Olnk &p2, std::vector<Bytes> &entries)
             pad(picture, 0x800);
             std::vector<Bytes> parts = {picture};
             parts.insert(parts.end(), pp.begin() + 1, pp.end());
-            entries.at(u.xbox) = build_pack(parts, pack_alignment(x));
+            entries.at(xbox) = build_pack(parts, pack_alignment(x));
             break;
         }
         }
     }
+}
+
+/* Heihachi in Spawn's place (the US disc only): as guest_ui. */
+void heihachi_ui(const Olnk &x2, const Olnk &p2, std::vector<Bytes> &entries)
+{
+    heihachi_ui_entries(x2, p2, entries, Layout(x2));
     {
         const Bytes x5 = x2.bytes(5);
         auto xp = parts_of(x5, false);
@@ -406,7 +437,7 @@ void heihachi_ui(const Olnk &x2, const Olnk &p2, std::vector<Bytes> &entries)
 constexpr uint32_t ROSTER_LINK = 27, ROSTER_HEIHACHI = 28;
 constexpr uint32_t ROSTER_LINK_BLOCK = 46 + 39 * 24, ROSTER_HEIHACHI_BLOCK = 46 + 39 * 25;
 /* (/2 index the conversion gives, the guest's own; the last, the picture its profile's unlock shows: /2/297 + its profile
-   item, 48 Link and 49 Heihachi, runtime/sc2_guest.cpp) */
+   item, 48 Link and 49 Heihachi, runtime/sc2_guest.cpp. As the US disc numbers them: Layout gives the European's.) */
 const uint32_t LINK_OWN_UI[][2] = {{86, 84}, {148, 146}, {180, 178}, {286, 284}, {424, 422}, {475, 470}, {476, 471}, {477, 472},
     {343, 345}};
 const uint32_t HEIHACHI_OWN_UI[][2] = {{86, 85}, {148, 147}, {180, 179}, {286, 285}, {424, 423}, {475, 473}, {476, 474},
@@ -526,6 +557,7 @@ void build_guests_root(const DiscFile &xbox, const DiscFile *gamecube, const Dis
     };
     auto [top, top_times] = entries_of(xroot);
     const Olnk x4 = xroot.child(4), x2 = xroot.child(2);
+    const Layout layout(x2);
     auto [e4, t4] = entries_of(x4);
     auto [e2, t2] = entries_of(x2);
     e4.resize(e4.size() + 78);
@@ -537,7 +569,8 @@ void build_guests_root(const DiscFile &xbox, const DiscFile *gamecube, const Dis
     std::vector<std::pair<uint32_t, Paletted>> small_new, large9_new, large10_new;
     /* The Art Gallery's thumbnails (runtime/sc2_guest.cpp, ApplyGallery): Hi-Res's (/2/395) gets Link's portrait,
        then Heihachi's and his two illustrations; Illustrations' (/2/396) gets Link's three. */
-    const Bytes hires = x2.bytes(395), illus = x2.bytes(396);
+    const uint32_t hires_entry = layout.ui(395), illus_entry = layout.ui(396);
+    const Bytes hires = x2.bytes(hires_entry), illus = x2.bytes(illus_entry);
     std::vector<std::pair<uint32_t, Paletted>> hires_new, illus_new;
 
     if (gamecube) {
@@ -548,13 +581,13 @@ void build_guests_root(const DiscFile &xbox, const DiscFile *gamecube, const Dis
         block.at(38) = roster_profile(dol_program(gamecube->program()), 0x80275A60u, 0x8028E9D8u, 0x80250520u, 1, ROSTER_LINK);
         std::copy(block.begin(), block.end(), e4.begin() + ROSTER_LINK_BLOCK);
         std::vector<Bytes> ui = e2;
-        guest_ui(x2, g2, ui);
-        for (const auto &pair : LINK_OWN_UI) e2.at(pair[1]) = ui.at(pair[0]);
+        guest_ui_entries(x2, g2, ui, layout);
+        for (const auto &pair : LINK_OWN_UI) e2.at(layout.ui(pair[1])) = ui.at(layout.ui(pair[0]));
         const Bytes gicons = parts_of(g2.bytes(5), true).at(2), g9 = g2.bytes(9), g10 = parts_of(g2.bytes(10), true).at(0);
         for (uint32_t k = 0; k < 4; ++k) {
             small_new.emplace_back(entry_flags(small, 51), c8_texture(gicons, 51 + k));
             large9_new.emplace_back(entry_flags(large9, 98), c8_texture(g9, 98 + k));
-            large10_new.emplace_back(entry_flags(large10.at(0), 100), c8_texture(g10, 100 + k));
+            large10_new.emplace_back(entry_flags(large10.at(0), layout.large(100)), c8_texture(g10, 100 + k));
         }
         const Bytes g395 = g2.bytes(395), g396 = g2.bytes(396);
         hires_new.emplace_back(entry_flags(hires, 20), c8_texture(g395, 20));
@@ -569,8 +602,8 @@ void build_guests_root(const DiscFile &xbox, const DiscFile *gamecube, const Dis
         block.at(38) = roster_profile(elf_program(ps2->program()), 0x003FABB8u, 0, 0x0048F958u, 1, ROSTER_HEIHACHI);
         std::copy(block.begin(), block.end(), e4.begin() + ROSTER_HEIHACHI_BLOCK);
         std::vector<Bytes> ui = e2;
-        heihachi_ui(x2, p2, ui);
-        for (const auto &pair : HEIHACHI_OWN_UI) e2.at(pair[1]) = ui.at(pair[0]);
+        heihachi_ui_entries(x2, p2, ui, layout);
+        for (const auto &pair : HEIHACHI_OWN_UI) e2.at(layout.ui(pair[1])) = ui.at(layout.ui(pair[0]));
         /* (the banks keep a reference to their bytes) */
         const Bytes picons_data = parts_of(p2.bytes(5), false).at(2), p9_data = p2.bytes(9),
                     p10_data = parts_of(p2.bytes(10), false).at(0);
@@ -578,7 +611,7 @@ void build_guests_root(const DiscFile &xbox, const DiscFile *gamecube, const Dis
         for (uint32_t k = 0; k < 2; ++k) {
             small_new.emplace_back(entry_flags(small, 51), picons.texture(51 + k).paletted());
             large9_new.emplace_back(entry_flags(large9, 98), p9.texture(98 + k).paletted());
-            large10_new.emplace_back(entry_flags(large10.at(0), 100), p10.texture(100 + k).paletted());
+            large10_new.emplace_back(entry_flags(large10.at(0), layout.large(100)), p10.texture(100 + k).paletted());
         }
         const Bytes p395_data = p2.bytes(395), p396_data = p2.bytes(396);
         Ps2Bank p395(p395_data), p396(p396_data);
@@ -586,8 +619,8 @@ void build_guests_root(const DiscFile &xbox, const DiscFile *gamecube, const Dis
         for (uint32_t k : {20u, 35u}) hires_new.emplace_back(entry_flags(hires, 20), p396.texture(k).paletted());
         step();
     }
-    if (!hires_new.empty()) e2.at(395) = append_p8(hires, hires_new);
-    if (!illus_new.empty()) e2.at(396) = append_p8(illus, illus_new);
+    if (!hires_new.empty()) e2.at(hires_entry) = append_p8(hires, hires_new);
+    if (!illus_new.empty()) e2.at(illus_entry) = append_p8(illus, illus_new);
     icons.at(2) = append_p8(small, small_new);
     e2.at(5) = build_pack(icons, pack_alignment(x2.bytes(5)));
     e2.at(9) = append_p8(large9, large9_new);
