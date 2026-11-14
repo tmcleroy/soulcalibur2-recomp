@@ -17,7 +17,7 @@ widescreen, higher resolutions and shaders.
 
 **No game files are included.** Your own Soulcalibur II Xbox disc image is the only one you need to play: the USA
 disc, or the European one (Europe, Australia), which plays in English, German, French, Spanish or Italian (the
-Language feature; for now on the Mac, and without the guests).
+Language feature; on macOS, Windows and Linux, not yet Android, and for now without the guests).
 Link and Heihachi are optional: give the launcher your own GameCube disc, PlayStation 2 disc, or both, to add
 them. This project cannot help you get any of them.
 
