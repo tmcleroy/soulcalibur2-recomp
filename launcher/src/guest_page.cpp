@@ -56,9 +56,10 @@ struct State {
     int picked_for = 0;
     std::atomic<bool> dialog{false};
     std::atomic<bool> copying{false};   // (Android: the chosen disc being copied into the app's folder)
+    std::atomic<long long> copy_done{0}, copy_total{0};
     std::atomic<bool> building{false};
     std::atomic<int> done{0}, total{1};
-    std::string error;               // the last build's, or ""
+    std::string error;               // the last build's or copy's, or ""
     std::thread worker;
     ~State() {
         if (worker.joinable()) worker.join();   // (a build under way finishes before the launcher ends)
@@ -128,7 +129,7 @@ void start_build(const std::string &xbox, const std::string discs[2], const std:
             if (!ps2.empty()) p2 = std::make_unique<guest::DiscFile>(guest::open_ps2_root(ps2));
             guest::build_guests_root(x, gc.get(), p2.get(), output.u8string(), progress);
         } catch (const std::exception &e) {
-            error = e.what();
+            error = std::string("It could not be built: ") + e.what();
         }
         {
             std::lock_guard<std::mutex> guard(s.lock);
@@ -147,7 +148,7 @@ void take(launcher::PageContext &page, int guest, const std::string &path) {
 // The system's picker, and the disc chosen copied into `folder` by the app's activity (LauncherActivity.importFiles,
 // as the Game page has its disc copied): the copy's path, or "" (on a thread of the caller's: it waits for the player
 // and the copy)
-std::string import_disc(const std::filesystem::path &folder) {
+std::string import_disc(const std::filesystem::path &folder, std::string &error_out) {
     std::error_code error;
     std::filesystem::create_directories(folder, error);
     JNIEnv *env = static_cast<JNIEnv *>(SDL_GetAndroidJNIEnv());
@@ -157,12 +158,22 @@ std::string import_disc(const std::filesystem::path &folder) {
     jclass activity_class = env->GetObjectClass(activity);
     jmethodID import = env->GetMethodID(activity_class, "importFiles", "(Ljava/lang/String;Z)V");
     jmethodID result = env->GetMethodID(activity_class, "importResult", "()Ljava/lang/String;");
+    jmethodID copied = env->GetMethodID(activity_class, "importCopied", "()J");
+    jmethodID total = env->GetMethodID(activity_class, "importTotal", "()J");
+    jmethodID import_error = env->GetMethodID(activity_class, "importError", "()Ljava/lang/String;");
+    if (env->ExceptionCheck()) env->ExceptionClear();
     if (import && result) {
         jstring folder_text = env->NewStringUTF(folder.string().c_str());
         env->CallVoidMethod(activity, import, folder_text, static_cast<jboolean>(false));
         env->DeleteLocalRef(folder_text);
+        State &st = state();
         for (;;) {
             SDL_Delay(100);
+            if (copied && total) {
+                st.copy_done = static_cast<long long>(env->CallLongMethod(activity, copied));
+                st.copy_total = static_cast<long long>(env->CallLongMethod(activity, total));
+                if (env->ExceptionCheck()) env->ExceptionClear();
+            }
             jstring text = static_cast<jstring>(env->CallObjectMethod(activity, result));
             if (env->ExceptionCheck()) {
                 env->ExceptionClear();
@@ -174,6 +185,17 @@ std::string import_disc(const std::filesystem::path &folder) {
             std::getline(lines, path);
             env->ReleaseStringUTFChars(text, chars);
             env->DeleteLocalRef(text);
+            if (path.empty() && import_error) {
+                jstring err = static_cast<jstring>(env->CallObjectMethod(activity, import_error));
+                if (env->ExceptionCheck()) {
+                    env->ExceptionClear();
+                } else if (err) {
+                    const char *err_chars = env->GetStringUTFChars(err, nullptr);
+                    if (err_chars && err_chars[0]) error_out = err_chars;
+                    env->ReleaseStringUTFChars(err, err_chars);
+                    env->DeleteLocalRef(err);
+                }
+            }
             break;
         }
     }
@@ -188,17 +210,28 @@ void choose_disc(launcher::PageContext &page, int guest) {
     State &s = state();
     s.dialog = true;
     s.picked_for = guest;
+    {
+        std::lock_guard<std::mutex> guard(s.lock);
+        s.error.clear();
+    }
 #ifdef __ANDROID__
+    s.copy_done = 0;
+    s.copy_total = 0;
     s.copying = true;
     std::thread([folder = page.folder / "guest" / "discs"] {
-        const std::string path = import_disc(folder);
+        std::string copy_error;
+        const std::string path = import_disc(folder, copy_error);
         State &st = state();
-        if (!path.empty()) {
+        {
             std::lock_guard<std::mutex> guard(st.lock);
-            st.picked = path;
+            if (!path.empty()) st.picked = path;
+            else if (!copy_error.empty()) st.error = "Could not copy the disc: " + copy_error;
         }
         st.copying = false;
         st.dialog = false;
+        SDL_Event event{};
+        event.type = SDL_EVENT_USER;
+        SDL_PushEvent(&event);
     }).detach();
     return;
 #endif
@@ -265,9 +298,20 @@ void GuestPage(launcher::PageContext &page) {
     std::string status;
     {
         std::lock_guard<std::mutex> guard(s.lock);
-        if (s.copying) status = "Copying the disc you chose into the app's folder…";
-        else if (s.building) status = "Converting…";
-        else if (!s.error.empty()) status = "It could not be built: " + s.error;
+        if (s.copying) {
+            const long long done = s.copy_done, total = s.copy_total;
+            if (total > 0) {
+                status = "Copying the disc into the app's folder… (" +
+                         std::to_string(done / (1024 * 1024)) + " / " +
+                         std::to_string(total / (1024 * 1024)) + " MB)";
+            } else if (done > 0) {
+                status = "Copying the disc into the app's folder… (" +
+                         std::to_string(done / (1024 * 1024)) + " MB)";
+            } else {
+                status = "Waiting for the file picker…";
+            }
+        } else if (s.building) status = "Converting…";
+        else if (!s.error.empty()) status = s.error;
         else if (built && guest::guests_version(output.u8string()) != guest::GUESTS_VERSION)
             status = "Built by an earlier release: press Rebuild. Until then the guests may lack what this release "
                      "adds, and online play needs both players' guests built by the same release.";
@@ -281,6 +325,9 @@ void GuestPage(launcher::PageContext &page) {
         if (s.building) {
             ui::progress_bar(ImGui::GetID("guest_progress"), float(s.done) / float(std::max(1, int(s.total))), px(130),
                              px(8));
+        } else if (s.copying && s.copy_total > 0) {
+            ui::progress_bar(ImGui::GetID("guest_copy_progress"),
+                             float(double(s.copy_done) / double(s.copy_total)), px(130), px(8));
         } else if (ui::button(built ? "Rebuild##guests" : "Build##guests", Kind::Primary, 130.0f, can_build)) {
             start_build(xbox_source(game_file), discs, output);
         }
