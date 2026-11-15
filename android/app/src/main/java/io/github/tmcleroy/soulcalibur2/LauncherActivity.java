@@ -35,6 +35,9 @@ public class LauncherActivity extends SDLActivity {
     private int nextSlot = 0;
     private volatile int result = 0;
     private volatile String imported = "";
+    private volatile long importCopiedBytes = 0;
+    private volatile long importTotalBytes = 0;
+    private volatile String importErrorMessage = null;
     private String importFolder;
     private volatile String pendingInstall;
 
@@ -206,16 +209,39 @@ public class LauncherActivity extends SDLActivity {
     public void importFiles(String folder, boolean many) {
         importFolder = folder;
         imported = null;
+        importCopiedBytes = 0;
+        importTotalBytes = 0;
+        importErrorMessage = null;
         final Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
         intent.addCategory(Intent.CATEGORY_OPENABLE);
         intent.setType("*/*");
         intent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, many);
-        runOnUiThread(() -> startActivityForResult(intent, REQUEST_IMPORT));
+        runOnUiThread(() -> {
+            try {
+                startActivityForResult(intent, REQUEST_IMPORT);
+            } catch (Exception e) {
+                Log.w("soulcalibur2", "could not open picker: " + e);
+                importErrorMessage = e.getMessage() != null ? e.getMessage() : e.toString();
+                imported = "";
+            }
+        });
     }
 
     // The copies' paths, one a line ("" for none), or null while the player chooses and they are copied
     public String importResult() {
         return imported;
+    }
+
+    public long importCopied() {
+        return importCopiedBytes;
+    }
+
+    public long importTotal() {
+        return importTotalBytes;
+    }
+
+    public String importError() {
+        return importErrorMessage;
     }
 
     @Override
@@ -258,13 +284,20 @@ public class LauncherActivity extends SDLActivity {
     // A document copied into a folder by its own name; its path there, or null
     private String copy(Uri uri, String folder) {
         String name = null;
-        try (Cursor cursor = getContentResolver().query(uri, new String[] {OpenableColumns.DISPLAY_NAME}, null, null, null)) {
+        long total = 0;
+        try (Cursor cursor = getContentResolver().query(uri,
+                new String[] {OpenableColumns.DISPLAY_NAME, OpenableColumns.SIZE}, null, null, null)) {
             if (cursor != null && cursor.moveToFirst()) {
                 name = cursor.getString(0);
+                if (!cursor.isNull(1)) {
+                    total = cursor.getLong(1);
+                }
             }
         } catch (Exception e) {
             Log.w("soulcalibur2", "no name for " + uri + ": " + e);
         }
+        importCopiedBytes = 0;
+        importTotalBytes = total > 0 ? total : 0;
         if (name == null || name.isEmpty()) {
             name = uri.getLastPathSegment();
         }
@@ -272,16 +305,30 @@ public class LauncherActivity extends SDLActivity {
         File to = new File(folder, name);
         File partial = new File(folder, name + ".part");
         try (InputStream in = getContentResolver().openInputStream(uri); OutputStream out = new FileOutputStream(partial)) {
-            byte[] buffer = new byte[1 << 16];
+            if (in == null) {
+                throw new java.io.IOException("could not open " + name);
+            }
+            byte[] buffer = new byte[1 << 20];
             for (int got; (got = in.read(buffer)) > 0;) {
                 out.write(buffer, 0, got);
+                importCopiedBytes += got;
             }
         } catch (Exception e) {
             Log.w("soulcalibur2", "could not copy " + uri + ": " + e);
+            if (importErrorMessage == null) {
+                importErrorMessage = e.getMessage() != null ? e.getMessage() : e.toString();
+            }
             partial.delete();
             return null;
         }
         to.delete();
-        return partial.renameTo(to) ? to.getPath() : null;
+        if (!partial.renameTo(to)) {
+            if (importErrorMessage == null) {
+                importErrorMessage = "could not move " + name + " into " + folder;
+            }
+            partial.delete();
+            return null;
+        }
+        return to.getPath();
     }
 }
