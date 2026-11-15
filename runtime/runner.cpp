@@ -42,6 +42,7 @@
 #include "sc2_version.h"
 #include "sc2_xbe.h"
 #include "sc2_fighter.h"
+#include "../recomp-common/folders.h"
 #include "../recomp-common/launcher/src/online.h"
 #include "sc2_online.h"
 #include "input_keyboard_win32.h"
@@ -991,6 +992,50 @@ static bool sampleInput(std::uint32_t port, RecompInputGamepad *gamepad)
     return sc2::TrainingPad(0u, gamepad, sampled);
 }
 
+#if !defined(__ANDROID__)
+/* Same user folder the launcher uses (recomp-common/folders.h), so running the game directly shares saves and
+   settings with the launcher without writing anything beside a disc image. */
+static std::filesystem::path defaultPlayerFolder()
+{
+    const std::string name = recomp::FolderName("Soulcalibur II");
+    if (const char *base = SDL_GetBasePath(); base != nullptr && *base) {
+        const std::filesystem::path portable = recomp::PortableFolder(std::filesystem::u8path(base));
+        if (!portable.empty()) return portable / std::filesystem::u8path(name);
+    }
+    if (char *pref = SDL_GetPrefPath("", name.c_str()); pref != nullptr) {
+        const std::filesystem::path folder = std::filesystem::u8path(pref);
+        SDL_free(pref);
+        return folder;
+    }
+    return {};
+}
+#endif
+
+static void printUsage(std::ostream &out, const char *argv0)
+{
+    std::string program = "soulcalibur2";
+    if (argv0 != nullptr && *argv0) {
+        const std::string name = std::filesystem::u8path(argv0).filename().u8string();
+        if (!name.empty()) program = name;
+    }
+    out << "usage: " << program << " [--disc <image> | --xbe <Default.xbe> [--disc-root <dir>]] [options]\n\n"
+        << "  --disc <image>           Xbox disc image (.iso); uses the user saves folder if --storage is omitted\n"
+        << "  --xbe <Default.xbe>      extracted disc's Default.xbe (--disc-root defaults to its folder)\n"
+        << "  --storage <dir>          saves folder (default: Soulcalibur II/saves for --disc or launcher setup)\n"
+        << "  --settings <file>        settings.ini (default: Soulcalibur II/settings.ini if present)\n"
+        << "  --fullscreen             start full screen\n"
+        << "  --widescreen             start in 16:9 widescreen\n"
+        << "  --mute                   start muted\n"
+        << "  --free-camera            enable free camera (` or right-stick click)\n"
+        << "  --guests <root.olk>      built Link and Heihachi file\n"
+        << "  --disc-file <name>=<file>  override a disc file\n"
+        << "  --host [port]            host an online match\n"
+        << "  --join <code|addr[:port]>  join an online match\n"
+        << "  --list-features          print available features and exit\n\n"
+        << "With no --disc or --xbe, " << program << " uses the disc last chosen in the launcher.\n"
+        << "You can also run soulcalibur2-launcher --play to launch straight into the game with all launcher settings.\n";
+}
+
 int main(int argc, char **argv)
 {
 #ifdef __ANDROID__
@@ -1034,6 +1079,10 @@ int main(int argc, char **argv)
     recomp_input_pulse_source_init(&inputPulses, recomp_input_host_sample, 0u);
     for (int i = 1; i < argc; ++i) {
         const std::string argument = argv[i];
+        if (argument == "--help" || argument == "-h") {
+            printUsage(std::cout, argc > 0 ? argv[0] : nullptr);
+            return 0;
+        }
         if (argument == "--input-script-only") {
             scriptedInputOnly = true;
             inputPulses.base = nullptr;
@@ -1189,15 +1238,7 @@ int main(int argc, char **argv)
              argument != "--storage" && argument != "--disc-file" && argument != "--guest-link" &&
              argument != "--guest-heihachi" && argument != "--guests" &&
              argument != "--expect-stop" && argument != "--milestone-log") || i + 1 >= argc) {
-            std::cerr << "usage: recomp_program_runner (--disc <image> | --xbe <path> [--disc-root <path>])"
-                " [--settings <settings.ini>] [--storage <dir>] [--disc-file <name>=<file>] [--fullscreen] [--widescreen] [--mute] [--free-camera]"
-                " [--list-features]"
-                " [--expect-stop <id>] [--milestone-log <path>]"
-                " [--input-start-pulse-at <poll>] [--input-a-pulse-at <poll>]"
-                " [--input-buttons-pulse-at <poll> <decimal-mask>]"
-                " [--input-analog-pulse-at <poll> <button-index>]"
-                " [--input-analog-pulse-every <first-poll> <period> <last-poll> <button-index>]"
-                " [--input-script-only] [--skip-intro]\n";
+            printUsage(std::cerr, argc > 0 ? argv[0] : nullptr);
             return 64;
         }
         const std::string value = argv[++i];
@@ -1214,10 +1255,47 @@ int main(int argc, char **argv)
         else if (argument == "--expect-stop") expectStop = value;
         else milestoneLog = value;
     }
+#if !defined(__ANDROID__)
+    const std::filesystem::path playerDir = defaultPlayerFolder();
+    bool discFromLauncher = false;
+    if (xbePath.empty() && discImage.empty() && !playerDir.empty()) {
+        recomp::Ini launcher((playerDir / "launcher.ini").u8string());
+        launcher.load();
+        const std::string savedDisc = launcher.get("game", "disc");
+        std::error_code ec;
+        if (!savedDisc.empty() && std::filesystem::is_regular_file(std::filesystem::u8path(savedDisc), ec)) {
+            std::string ext = std::filesystem::u8path(savedDisc).extension().u8string();
+            for (char &c : ext) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+            if (ext == ".xbe") xbePath = savedDisc;
+            else discImage = savedDisc;
+            discFromLauncher = true;
+        }
+    }
+#endif
     if (xbePath.empty() == discImage.empty()) {
-        std::cerr << "recomp runner: give --disc or --xbe\n";
+        std::cerr << "soulcalibur2: "
+                  << (xbePath.empty()
+                          ? "no disc image or Default.xbe given.\n"
+                            "Pass --disc <image.iso> or --xbe <Default.xbe>, or open soulcalibur2-launcher once to choose your game.\n"
+                            "Run with --help for options.\n"
+                          : "give --disc or --xbe, not both.\n");
         return 64;
     }
+#if !defined(__ANDROID__)
+    if ((!discImage.empty() || discFromLauncher) && storageRoot.empty() && !playerDir.empty()) {
+        const std::filesystem::path savesDir = playerDir / "saves";
+        std::error_code ec;
+        std::filesystem::create_directories(savesDir, ec);
+        storageRoot = savesDir.u8string();
+    }
+    if (settingsPath.empty() && !playerDir.empty()) {
+        const std::filesystem::path defaultSettings = playerDir / "settings.ini";
+        std::error_code ec;
+        if (std::filesystem::is_regular_file(defaultSettings, ec)) {
+            settingsPath = defaultSettings.u8string();
+        }
+    }
+#endif
     if (!discImage.empty() && storageRoot.empty()) {
         std::cerr << "recomp runner: --disc needs --storage (nothing is written beside an image)\n";
         return 64;
