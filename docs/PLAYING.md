@@ -22,6 +22,8 @@ The launcher is where the game is set up and started. Its pages:
 
 The launcher checks for new versions when it opens and installs them itself.
 
+To skip the launcher window once your disc is set up, run `soulcalibur2-launcher --play` (or `soulcalibur2` directly, or `soulcalibur2 --disc path/to/game.iso`; run `soulcalibur2 --help` for options).
+
 ## Controls
 
 The game's own layout: X horizontal attack, Y vertical attack, B kick, A guard. Any gamepad SDL knows works; the
