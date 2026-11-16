@@ -43,6 +43,7 @@ extern void sub_0001C2B0(void);
 extern void sub_00145A40(void);
 extern void sub_000344D0(void);
 extern void sub_0002A350(void);
+extern void sub_000DE480(void);
 /* rand (0x145A40). Online, the calls from 0x140730 and 0x141840 (sound and effects, run as often as the host's
    audio and timing have them, so not as often on both machines) draw from a state of their own, so that the
    game's numbers stay alike on both. */
@@ -144,15 +145,15 @@ int sc2_movie_skip;
    switches to it once the fade is done. */
 static void scene_switch(void)
 {
-    static bool bonus_endings_ready;
-    if (!bonus_endings_ready) {
-        bonus_endings_ready = true;
-        const int16_t spawn_ending[4] = {86, 11, 85, 0};
-        for (uint32_t c = 30u; c <= 32u; ++c) {
-            memcpy(recomp_memory(0x0034ED88u + 8u * c, sizeof spawn_ending), spawn_ending, sizeof spawn_ending);
-        }
-    }
     const uint32_t esp = recomp_runtime.registers.esp;
+    /* The Arcade ending (scene 13, after the last fight) for Lizardman and Assassin, who have none: as on the other
+       consoles, it is left out, and the game goes on to the scene the ending ends with (15, 0x4F160). (The
+       ending scene's mode 16 plays it over and over; there arcade_ending, below, ends it at once.) */
+    if (*recomp_memory_u32(esp + 4u) == 13u && *(const uint16_t *)recomp_memory(0x0039895Eu, 2u) != 16u) {
+        const uint32_t record = *recomp_memory_u32(0x00398A08u);
+        const int16_t character = record ? *(const int16_t *)recomp_memory(record + 0x58u, 2u) : 1;
+        if (character == 30 || character == 31) *recomp_memory_u32(esp + 4u) = 15u;
+    }
     sc2_scene = *recomp_memory_u32(esp + 4u);
     ++sc2_scene_switches;
     fprintf(stderr, "recomp sc2: scene %u\n", sc2_scene);
@@ -303,8 +304,28 @@ static void boss_form(void)
     sub_000528E0();
 }
 
+/* 0xDE480(ending), the Arcade ending's first step: loads its picture and text by the character's row in the table
+   at 0x34ED88 (the /2 entry of its picture, the lines of its text plus one, its first text in /2/87). The bonus
+   fighters (Lizardman 30, Assassin 31, Berserker 32) have no rows (-1: /2/-1 is loaded and the game stops). As on
+   the other consoles, Berserker has Astaroth's (18), and Lizardman and Assassin none: their ending scene is left
+   out (scene_switch); where it still starts (mode 16), it goes straight to its last step (3, done). */
+static void arcade_ending(void)
+{
+    const uint32_t ending = *recomp_memory_u32(recomp_runtime.registers.esp + 4u);
+    const uint32_t character = *recomp_memory_u32(ending + 0x74u);
+    if (character == 30u || character == 31u) {
+        *recomp_memory_u32(ending + 0x7cu) = 3u;
+        recomp_runtime.registers.esp += 4u;   /* the original's ret */
+        return;
+    }
+    if (character == 32u) {
+        memcpy(recomp_memory(0x0034ED88u + 8u * 32u, 8u), recomp_memory(0x0034ED88u + 8u * 18u, 8u), 8u);
+    }
+    sub_000DE480();
+}
+
 /* 0x698D0(character, costume), availability callback for bonus characters
-   (Berserker 30, Assassin 31, Lizardman 32). In the original it only allowed
+   (Lizardman 30, Assassin 31, Berserker 32). In the original it only allowed
    them in VS, Team Battle and Practice (returning 0 for Arcade, Survival, and
    Time Attack). Unlocked everywhere: available in all modes once unlocked. */
 static void character_available_bonus(void)
@@ -619,6 +640,7 @@ RecompFunction recomp_sc2_hooks_lookup_manual(uint32_t address)
     case 0x00032630u: return frame_begins;
     case 0x000344d0u: return data_region;
     case 0x0002a350u: return leave_for_dashboard;
+    case 0x000de480u: return arcade_ending;
     default: break;
     }
     const RecompFunction items = sc2_guest_items_lookup(address);
