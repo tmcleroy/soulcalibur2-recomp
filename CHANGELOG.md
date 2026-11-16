@@ -17,6 +17,9 @@ Fixes from the European disc and Linux test builds ([#77](https://github.com/tmc
 - **The in-game menu with a keyboard**: each key worked once, then not again until the window lost and regained the
   keyboard (seen on Linux; the same on every system). A gamepad was not affected.
 - **Weapon Master above full speed**: starting a mission with the speed above Full stopped the game.
+- **Arcade endings for Lizardman, Assassin and Berserker** ([#65](https://github.com/tmcleroy/soulcalibur2-recomp/issues/65)):
+  all three got Spawn's ending. As on the GameCube and PlayStation 2, Lizardman and Assassin now have none (the game
+  goes on to Game Over and the name entry), and Berserker gets Astaroth's.
 
 ## 0.4.0-beta.1
 
