@@ -45,3 +45,15 @@
 0x001968a0 0x0019b0e0
 0x0034ed88 0x003608f8   # Arcade endings table: 1 reference, 64/64 bytes alike
 0x003cb418 0x003dd0a8   # frame count: +8 into the object at 0x3cb410, whose pointer table entry is at PAL 0x225b58 (0x3dd0a0)
+
+# --- issue #77 (the guests' weapons as items, the weapon gallery's rows, Weapon Master's wider select box)
+0x000698d0 0x0006ae40   # bonus characters' availability: 0.94 shape match, 0x40 after 0x69890 -> 0x6ae00 as in the US program
+0x000faf6c 0x000ffddc   # the shop step's return from 0xF5D20 (PAL 0xFA200: its two callers are the step and the help line)
+0x000f7a80 0x000fc0e5   # the help line's return from 0xF5D20
+0x000f7bac 0x000fc211   # the help line's return from 0x56740 (PAL 0x57CD0; the one call inside the help line's function)
+0x000fb001 0x000ffe71   # the shop step's two returns from 0xF3940 (PAL 0xF7E20: its only two callers)
+0x000fb025 0x000ffe95
+0x000fb06f 0x000ffedf   # the shop step's return from 0x57680 (PAL 0x58C10; the one call in the step)
+0x000fb088 0x000ffef8   # the shop step's return from 0x580A0 (PAL 0x59640: its only caller outside 0x59xxx)
+0x000fa408 0x000feb09   # the select build's return from 0xB81B0 (PAL 0xBB3D0; the one call inside PAL 0xFE700's function)
+0x0034eed0 0x00360a30   # the weapon gallery's table: PAL 0xE3100 (US 0xDF110) copies 19 rows from it, to 0x360AC8

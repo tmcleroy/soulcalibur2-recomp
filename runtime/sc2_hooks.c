@@ -7,6 +7,7 @@
 #include "kernel_abi.h"
 #include "program_manual.h"
 #include "sc2_guest.h"
+#include "sc2_version.h"
 #include "scene_freeze_adapter.h"
 
 #include <stdbool.h>
@@ -40,6 +41,8 @@ extern void sub_000DCFA0(void);
 extern void sub_000528E0(void);
 extern void sub_0001C2B0(void);
 extern void sub_00145A40(void);
+extern void sub_000344D0(void);
+extern void sub_0002A350(void);
 /* rand (0x145A40). Online, the calls from 0x140730 and 0x141840 (sound and effects, run as often as the host's
    audio and timing have them, so not as often on both machines) draw from a state of their own, so that the
    game's numbers stay alike on both. */
@@ -329,15 +332,23 @@ static void character_available_bonus(void)
 }
 
 /* 0x566F0 (character in esi, weapon in edi): the item that unlocks a character's weapon 2-11 (86 + 10 x its
-   place in the 24-character roster, 0x36A70, + the weapon). The guests beside Spawn have no place there, so
-   theirs came out as items 78-87, which are other things. They take the guest slot's, Spawn's: Link's and
-   Heihachi's weapons are had as Spawn's are, as each had them on their own console. */
+   place in the 24-character roster, 0x36A70, + the weapon), or -1 (the weapon it starts with, or a mode that gives
+   every weapon). The guests beside Spawn have no place there, so theirs came out as items 78-87, which are other
+   things. They have items of their own past the game's (sc2_guest_items.c), where the guest slot's has one. */
 static void weapon_item(void)
 {
     const uint32_t character = recomp_runtime.registers.esi;
-    if (character == 27u || character == 28u) recomp_runtime.registers.esi = 29u;
+    if (character != 27u && character != 28u) {
+        sub_000566F0();
+        return;
+    }
+    recomp_runtime.registers.esi = 29u;
     sub_000566F0();
     recomp_runtime.registers.esi = character;
+    if (recomp_runtime.registers.eax != 0xFFFFFFFFu) {
+        const int own = sc2_guest_weapon_item(character, recomp_runtime.registers.edi);
+        if (own >= 0) recomp_runtime.registers.eax = (uint32_t)own;
+    }
 }
 
 /* 0xC4940(records, slot, character), thiscall: counts a play of the character in the records (the count at +8 + its
@@ -529,8 +540,52 @@ static void frame_begins(void)
     sub_00032630();
 }
 
+/* 0x344D0(region, name, base, size): one of the regions the game splits its data memory into (0x34520 makes them,
+   each a fixed size at a fixed place). The first, "SYSTEM_DATA", holds /2/5 alone (the select screens' small icons
+   and, on the European disc, the weapons' effect icons after them); "COMMON MOTION" follows it. The US disc's /2/5
+   is 0x123A00 bytes in a region of 0x140000. The European disc's is 0x14B000 in one of 0x14E000, and the guests'
+   six icons make it 0x152900: its end, the last effect icons' pictures, lay in the next region and was written
+   over, so one effect icon was noise for every character (issue #77). With the guests the European program's first
+   region is 0x8000 longer and the second, which has 0x49000 to spare, starts and ends that much later. */
+static void data_region(void)
+{
+#if SC2_PAL
+    enum { MORE = 0x8000u };
+    const uint32_t esp = recomp_runtime.registers.esp;
+    if (sc2_guest_loaded(27u) || sc2_guest_loaded(28u)) {
+        const char *name = (const char *)recomp_memory(*recomp_memory_u32(esp + 8u), 16u);
+        if (strncmp(name, "SYSTEM_DATA", 12u) == 0) {
+            *recomp_memory_u32(esp + 0x10u) += MORE;
+        } else if (strncmp(name, "COMMON MOTION", 14u) == 0) {
+            *recomp_memory_u32(esp + 0xCu) += MORE;
+            *recomp_memory_u32(esp + 0x10u) -= MORE;
+        }
+    }
+#endif
+    sub_000344D0();
+}
+
+/* 0x2A350(request): the game leaves for the Xbox Dashboard (request: what for; 3 is its memory screen, with the
+   drive and the blocks wanted). It fades the sound out, stops its threads and calls XLaunchNewImage with no program.
+   The one way there in play is "SOULCALIBUR II game data is unusable. Press B to delete unusable data": a save it
+   cannot read (the other release's: the European program finds the US disc's save and the other way round), which
+   the player was to delete in the Dashboard. There is no Dashboard, and the game's own way out hung with a black
+   screen (issue #77). The save is set aside and the game started over, as the player would have it after
+   (runner.cpp, sc2_dashboard: it comes back only when it could not, and the game then goes on as before). */
+void sc2_dashboard(void);
+static void leave_for_dashboard(void)
+{
+    const uint32_t request = *recomp_memory_u32(recomp_runtime.registers.esp + 4u);
+    if (request != 0u && *recomp_memory_u32(request) == 3u) sc2_dashboard();
+    sub_0002A350();
+}
+
 /* Weapon Master's character select with the guests' row (sc2_wm_select.c) */
 RecompFunction sc2_wm_select_lookup(uint32_t address);
+/* The guests' weapons as items of their own (sc2_guest_items.c) */
+RecompFunction sc2_guest_items_lookup(uint32_t address);
+/* ... and their rows in the Museum's weapon gallery (sc2_guest_gallery.c) */
+RecompFunction sc2_guest_gallery_lookup(uint32_t address);
 
 RecompFunction recomp_sc2_hooks_lookup_manual(uint32_t address)
 {
@@ -562,6 +617,12 @@ RecompFunction recomp_sc2_hooks_lookup_manual(uint32_t address)
     case 0x00077520u: return museum_characters;
     case 0x0002ec90u: return box_frame;
     case 0x00032630u: return frame_begins;
-    default: return sc2_wm_select_lookup(address);
+    case 0x000344d0u: return data_region;
+    case 0x0002a350u: return leave_for_dashboard;
+    default: break;
     }
+    const RecompFunction items = sc2_guest_items_lookup(address);
+    if (items) return items;
+    const RecompFunction gallery = sc2_guest_gallery_lookup(address);
+    return gallery ? gallery : sc2_wm_select_lookup(address);
 }

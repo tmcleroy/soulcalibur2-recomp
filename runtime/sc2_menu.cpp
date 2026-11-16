@@ -212,11 +212,32 @@ void Configure()
     menu.Configure(std::move(config));
 }
 
+/* The keys while the menu is open. A key's press is kept until the keys are next sampled (so that a quick tap between
+   two of the game's frames is not lost), and recomp_input_scancode_held counts that kept press as held. In play the
+   game samples them every frame; with the menu open nothing did, so a key was held for good after its first press
+   and worked once: Down went one row and no further until the window lost the keyboard and got it back (issue #77:
+   seen on Linux, the same everywhere; a gamepad was never affected). The menu samples them itself, once each time
+   round its loop. */
+uint8_t menu_keys[RECOMP_INPUT_SCANCODE_COUNT];
+bool menu_sampling;
+
+void SampleMenuKeys()
+{
+    menu_sampling = true;
+    recomp_input_scancode_sample(menu_keys);
+}
+
+bool KeyHeld(uint32_t code)
+{
+    if (!menu_sampling) return recomp_input_scancode_held(code);
+    return code < RECOMP_INPUT_SCANCODE_COUNT && menu_keys[code] != 0u;
+}
+
 /* The menu's buttons held now: the arrows, Return or Space, Esc or Backspace;
    a gamepad's d-pad or left stick, South, East, Back or Start. */
 unsigned Held()
 {
-    const auto key = [](SDL_Scancode code) { return recomp_input_scancode_held(code); };
+    const auto key = [](SDL_Scancode code) { return KeyHeld(code); };
     const uint64_t pad = recomp_input_host_pad_buttons();
     const auto button = [&](SDL_GamepadButton b) { return (pad >> b & 1u) != 0u; };
     unsigned held = 0;
@@ -277,7 +298,7 @@ int TypedKey()
     static bool held[SDL_SCANCODE_COUNT];
     int typed = 0;
     for (int code = SDL_SCANCODE_A; code <= SDL_SCANCODE_PERIOD && typed == 0; ++code) {
-        const bool now = recomp_input_scancode_held(static_cast<uint32_t>(code));
+        const bool now = KeyHeld(static_cast<uint32_t>(code));
         if (now && !held[code]) {
             if (code <= SDL_SCANCODE_Z) typed = 'A' + (code - SDL_SCANCODE_A);
             else if (code >= SDL_SCANCODE_1 && code <= SDL_SCANCODE_9) typed = '1' + (code - SDL_SCANCODE_1);
@@ -316,10 +337,12 @@ void Run(bool scripted)
     sc2_touch_set_menu(true);
     unsigned frames_open = 0;
     bool lobby_shown = false;
+    SampleMenuKeys();
     unsigned previous = scripted ? 0u : Held(); /* the press that opened it is not a menu press */
     size_t script = 0u;
     while (menu.IsOpen()) {
         unsigned pressed = 0u;
+        SampleMenuKeys();
         if (scripted) {
             if (script < shot.keys.size()) {
                 switch (shot.keys[script++]) {
@@ -413,7 +436,9 @@ void Run(bool scripted)
     for (int frames = 0; !scripted && Held() != 0u && frames < 120; ++frames) {
         recomp_d3d_presenter_show_image(presenter, frame.data(), width, height);
         std::this_thread::sleep_for(std::chrono::milliseconds(16));
+        SampleMenuKeys();
     }
+    menu_sampling = false;
     recomp_audio_output_set_paused(0);
 }
 
@@ -534,7 +559,7 @@ void OnPresent(uint32_t swap_counter)
     ApplyTraining(swap_counter);
     PlayKeys();
     /* (tests: SC2_TEST_KEYS=SWAP:WHAT,... does at those Swaps what a key or the menu would: save, load (slot 1),
-       over (start over), record, replay, slow, fast (2x), pause, unlock, endless, skip: a press, hud: the HUD hidden or shown,
+       over (start over), record, replay, slow, fast (2x), turbo (8x), full (speed), pause, unlock, endless, skip: a press, hud: the HUD hidden or shown,
        start: Start held on controller 1 for six reads, hd: HD textures on or off) */
     if (const char *keys = std::getenv("SC2_TEST_KEYS")) {
         for (const char *p = keys; *p;) {
@@ -553,6 +578,8 @@ void OnPresent(uint32_t swap_counter)
                 else if (action == "replay") TrainingState().dummy = Dummy::Replay;
                 else if (action == "slow") speed = 1;
                 else if (action == "fast") speed = 8;
+                else if (action == "turbo") speed = kSpeedCount - 1;
+                else if (action == "full") speed = kFullSpeed;
                 else if (action == "pause") recomp_scene_freeze_set(true);
                 else if (action == "unlock") TrainingUnlockAll();
                 else if (action == "endless") TrainingState().endless = !TrainingState().endless;
