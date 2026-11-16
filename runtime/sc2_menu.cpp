@@ -10,6 +10,7 @@
 
 #include "sc2_settings.h"
 #include "sc2_online.h"
+#include "sc2_pictures.h"
 #include "sc2_state.h"
 #include "sc2_version.h"
 #include "sc2_training.h"
@@ -120,7 +121,7 @@ const std::vector<std::string> kSpeeds = [] {
 int speed = kFullSpeed;
 
 /* The menu's commands, by their place in MenuConfig::commands */
-enum Command { kHost, kStartOver, kUnlock, kJoinCode, kJoinListed };
+enum Command { kHost, kStartOver, kUnlock, kExportPictures, kShowPictures, kJoinCode, kJoinListed };
 
 /* Joining from the Online page: the lobby's matches shown (by their place after kJoinListed), and the code being
    typed for "Join with a code" (shown in the menu's note) */
@@ -129,6 +130,10 @@ bool typing_code;
 std::string typed_code;
 
 bool escape_free = true, back_free = true;
+
+/* --export-pictures (ExportPicturesAt) */
+uint32_t export_present;
+std::string export_folder;
 
 struct Shot {
     uint32_t present = 0;
@@ -182,6 +187,13 @@ void Configure()
     config.commands.push_back({"Cheats", "Unlock everything",
         "Every character, stage, mode, weapon and Museum page the game unlocks, had now. The game keeps them in your "
         "save the next time it saves."});
+    const std::string pictures = PicturesFolder(settings_path);
+    config.commands.push_back({"Pictures", "Export pictures",
+        "Writes the Art Gallery's pictures (Hi-Res, Illustrations and Special, the guests' with them) as JPEG files to " +
+            pictures + " (the pictures folder in your files: the launcher's YOUR FILES). Files already there are "
+            "written over."});
+    config.commands.push_back({"Pictures", "Show pictures folder",
+        "Opens " + pictures + " (where Export pictures writes) in your file manager."});
     if (OnlineCanHost()) {
         config.commands.push_back({"Online", "Join with a code",
             "Type the code the host's game shows (or the host's address) and press Return: the game starts again and "
@@ -401,6 +413,17 @@ void Run(bool scripted)
             if (chosen.kind == recomp::Menu::Chosen::Load && !StateSaved(menu.Slot())) menu.Note("That slot is empty.");
             else menu.Close();
         }
+        if (chosen.kind == recomp::Menu::Chosen::Command && chosen.id == kExportPictures) {
+            const std::string folder = PicturesFolder(settings_path);
+            std::string error;
+            const int written = ExportPictures(folder, error);
+            menu.Note(written < 0 ? error : std::to_string(written) + " pictures written to " + folder + ".");
+        } else if (chosen.kind == recomp::Menu::Chosen::Command && chosen.id == kShowPictures) {
+            const std::string folder = PicturesFolder(settings_path);
+            std::error_code fault;
+            std::filesystem::create_directories(std::filesystem::u8path(folder), fault);
+            OpenFolder(folder);
+        }
         if (chosen.kind == recomp::Menu::Chosen::Command && chosen.id == kUnlock) {
             TrainingUnlockAll();
             menu.Close();
@@ -596,6 +619,15 @@ void OnPresent(uint32_t swap_counter)
         const Speed &one = kSpeedTable[speed];
         std::this_thread::sleep_for(std::chrono::microseconds(16667 * (one.ticks - one.frames) / one.frames));
     }
+    if (export_present != 0u && swap_counter == export_present) {
+        const std::string folder = export_folder.empty() ? PicturesFolder(settings_path) : export_folder;
+        std::string error;
+        const int written = ExportPictures(folder, error);
+        if (written < 0) std::fprintf(stderr, "recomp sc2: export pictures: %s\n", error.c_str());
+        else std::fprintf(stderr, "recomp sc2: export pictures: %d written to %s\n", written, folder.c_str());
+        recomp_stop(written < 0 ? 1 : 0, "export-pictures");
+        return;
+    }
     static bool held_before = true; /* (a key held at the start does not open it) */
     if (shot.present != 0u && swap_counter == shot.present) {
         Run(true);
@@ -638,6 +670,13 @@ void SetShader(int choice)
 {
     shader_choice = choice;
     recomp_d3d_set_shader_preset(ShaderPreset(choice, settings_path).c_str());
+}
+
+void ExportPicturesAt(const std::string &spec)
+{
+    const size_t colon = spec.find(':');
+    export_present = static_cast<uint32_t>(std::strtoul(spec.substr(0, colon).c_str(), nullptr, 10));
+    export_folder = colon == std::string::npos ? std::string() : spec.substr(colon + 1u);
 }
 
 void InstallMenu(const std::string &settingsPath, const std::string &shotSpec)

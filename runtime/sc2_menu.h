@@ -21,6 +21,10 @@ void SetShader(int choice);
 /* The speed chosen (the menu's Speed, - and =): game frames to a frame shown (1 at full speed; online, always 1) */
 double GameSpeed();
 
+/* Tests (--export-pictures PRESENT[:FOLDER]): at that Swap the menu's Export pictures runs, to FOLDER or the pictures
+   folder beside settings.ini; it says how many on stderr and the game ends (stop "export-pictures", 1 on a failure). */
+void ExportPicturesAt(const std::string &spec);
+
 /* Tests (SC2_TEST_KEYS SWAP:start): reads of controller 1 still to be given Start, counted down by the runner */
 extern int test_start_reads;
 

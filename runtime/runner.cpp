@@ -23,7 +23,9 @@
                        --net-name NAME --net-delay FRAMES --net-list --net-service URL|off
                      --net-invite TO:FROM --net-invite-name NAME (a player in the launcher's waiting room invited)
      --list-features   prints the features for the launcher and ends
-     --menu-shot PRESENT:KEYS:FILE.bmp  tests the in-game menu (sc2_menu.h) */
+     --menu-shot PRESENT:KEYS:FILE.bmp  tests the in-game menu (sc2_menu.h)
+     --export-pictures PRESENT[:FOLDER]  at that Swap, the menu's Export pictures (to FOLDER, or the pictures
+                       folder beside settings.ini), and the game ends (sc2_pictures.h) */
 #include "host_diagnostics.h"
 #include "d3d8_adapter.h"
 #include "dsound_api_adapter.h"
@@ -45,6 +47,7 @@
 #include "../recomp-common/folders.h"
 #include "../recomp-common/launcher/src/online.h"
 #include "sc2_online.h"
+#include "sc2_pictures.h"
 #include "input_keyboard_win32.h"
 #include "sc2_state.h"
 
@@ -1126,7 +1129,7 @@ int main(int argc, char **argv)
     }
     recomp_install_host_diagnostics();
     recomp_d3d_frame_breakdown = recomp_kernel_thread_times;
-    std::string xbePath, discRoot, expectStop, milestoneLog, settingsPath, storageRoot, discImage, menuShot;
+    std::string xbePath, discRoot, expectStop, milestoneLog, settingsPath, storageRoot, discImage, menuShot, exportPictures;
     std::vector<std::string> discFiles;
     std::string guestLink, guestHeihachi, guests;
     sc2::Netplay::Settings netSettings;
@@ -1290,7 +1293,7 @@ int main(int argc, char **argv)
             continue;
         }
         if ((argument != "--xbe" && argument != "--disc-root" && argument != "--settings" &&
-             argument != "--disc" && argument != "--menu-shot" &&
+             argument != "--disc" && argument != "--menu-shot" && argument != "--export-pictures" &&
              argument != "--storage" && argument != "--disc-file" && argument != "--guest-link" &&
              argument != "--guest-heihachi" && argument != "--guests" &&
              argument != "--expect-stop" && argument != "--milestone-log") || i + 1 >= argc) {
@@ -1303,6 +1306,7 @@ int main(int argc, char **argv)
         else if (argument == "--settings") settingsPath = value;
         else if (argument == "--disc") discImage = value;
         else if (argument == "--menu-shot") menuShot = value;
+        else if (argument == "--export-pictures") exportPictures = value;
         else if (argument == "--storage") storageRoot = value;
         else if (argument == "--disc-file") discFiles.push_back(value);
         else if (argument == "--guest-link") guestLink = value;
@@ -1386,6 +1390,7 @@ int main(int argc, char **argv)
         sc2::ApplyTextures({}, false, false);
     }
     sc2::InstallMenu(settingsPath, menuShot);
+    if (!exportPictures.empty()) sc2::ExportPicturesAt(exportPictures);
     sc2::SetShader(shader);
     /* A disc image: its Default.xbe is read out of it, and the D: drive is
        served from it (disc_image.h). */
@@ -1465,6 +1470,7 @@ int main(int argc, char **argv)
             std::cerr << "recomp runner: --disc-file " << file << " is not NAME=FILE of a readable file\n";
             return 64;
         }
+        if (name == "root.olk") sc2::SetPicturesRootOlk(host);   /* (the gallery's pictures are read from it) */
     }
     std::string matchStorage;
     {
