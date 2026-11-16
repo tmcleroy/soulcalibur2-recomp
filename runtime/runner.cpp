@@ -244,9 +244,64 @@ static unsigned netEndedShown;
    the same code while its game plays on (when they come, it starts over for the match, as hosting from the menu
    does); a joining player whose connection was lost starts again joining the same match (--net-again). */
 static bool netAgain;          // (--net-again: this copy is one started again to come back)
+static bool startedOver;       // (--started-over: this copy is one started in place of another, sc2_dashboard)
 static bool netFresh;          // (--net-fresh: this copy is the one started over for the match: it takes them in)
 static bool netWaitingReturn;  // (hosting again, for the other player to come back)
 [[noreturn]] static void rejoin();
+/* The game leaves for the Xbox Dashboard (XLaunchNewImage with no program, program_manual.c): the one case is its
+   "game data is unusable: delete it?" (a save it cannot read, another release's: the European program with the US
+   disc's save, issue #77), where the player would delete the save in the Dashboard and start the game again. There
+   is no Dashboard: the save is set aside (kept, in "saves set aside" in the storage folder) and the game starts
+   over, as it would after. The folder is marked here and the saves moved as the new copy starts, before it opens
+   them (this copy still holds them). */
+[[noreturn]] static void startAgain(std::vector<std::string> args);
+static std::vector<std::string> argsAgain();
+static std::string dashboardStorage;
+static const char *const kSetAsideMark = "set-saves-aside";
+
+extern "C" void sc2_dashboard(void)
+{
+    if (dashboardStorage.empty() || netplay) return;   // (nowhere of its own to set them aside in: the caller stops)
+    std::error_code error;
+    const std::filesystem::path mark = std::filesystem::u8path(dashboardStorage) / kSetAsideMark;
+    if (std::FILE *file = std::fopen(mark.u8string().c_str(), "wb")) std::fclose(file);
+    else return;
+    std::fprintf(stderr, "recomp sc2: the game asks for the Dashboard to delete its save: set aside, starting over\n");
+    std::vector<std::string> args = argsAgain();
+    args.push_back("--started-over");
+    startAgain(args);
+}
+
+/* A storage folder marked by sc2_dashboard: each saved game in it (partition1/UDATA/<title>/<save>/) moved to
+   "saves set aside/<n>/<title>/<save>" */
+static void setSavesAside(const std::filesystem::path &storage)
+{
+    std::error_code error;
+    const std::filesystem::path mark = storage / kSetAsideMark;
+    if (!std::filesystem::exists(mark, error)) return;
+    std::filesystem::remove(mark, error);
+    const std::filesystem::path aside = storage / "saves set aside";
+    std::filesystem::path into;
+    for (int n = 1; n < 1000; ++n) {
+        into = aside / std::to_string(n);
+        if (!std::filesystem::exists(into, error)) break;
+    }
+    unsigned moved = 0;
+    for (const auto &title : std::filesystem::directory_iterator(storage / "partition1" / "UDATA", error)) {
+        if (!title.is_directory(error)) continue;
+        std::vector<std::filesystem::path> saves;
+        for (const auto &save : std::filesystem::directory_iterator(title.path(), error))
+            if (save.is_directory(error)) saves.push_back(save.path());
+        for (const std::filesystem::path &save : saves) {
+            const std::filesystem::path to = into / title.path().filename() / save.filename();
+            std::filesystem::create_directories(to.parent_path(), error);
+            std::filesystem::rename(save, to, error);
+            if (!error) ++moved;
+        }
+    }
+    std::fprintf(stderr, "recomp sc2: %u saved game(s) set aside in %s\n", moved, into.u8string().c_str());
+}
+
 static void hostAgain(const std::string &code, const std::string &secret);
 [[noreturn]] static void startAgain(std::vector<std::string> args);
 static std::vector<std::string> argsAgain();
@@ -799,7 +854,7 @@ static std::vector<std::string> argsAgain()
         const std::string &arg = runnerArgs[i];
         if (arg == "--menu-shot") { ++i; continue; } // (a test's menu picture: once)
         if (arg == "--net-renew") { i += 2; continue; }
-        if (arg == "--net-again" || arg == "--net-fresh") continue;
+        if (arg == "--net-again" || arg == "--net-fresh" || arg == "--started-over") continue;
         if (arg == "--net-invite" || arg == "--net-invite-name") { ++i; continue; } // (they have the match's code)
         if (arg == "--host") {
             if (i + 1 < runnerArgs.size() && std::isdigit(static_cast<unsigned char>(runnerArgs[i + 1][0]))) ++i;
@@ -1134,6 +1189,7 @@ int main(int argc, char **argv)
             continue;
         }
         if (argument == "--net-again") { netAgain = true; continue; }
+        if (argument == "--started-over") { startedOver = true; continue; }
         if (argument == "--net-fresh") { netFresh = true; continue; }
         if (argument == "--net-invite" && i + 1 < argc) {
             const std::string value = argv[++i];
@@ -1494,6 +1550,11 @@ int main(int argc, char **argv)
             sc2_net_seeded = 1;
         }
     }
+    /* (a save the game asked to have deleted, sc2_dashboard: set aside before it is opened) */
+    if (!storageRoot.empty()) {
+        if (!netplay) dashboardStorage = storageRoot;
+        setSavesAside(std::filesystem::u8path(storageRoot));
+    }
     const auto saveInitialize = [&] {
         return storageRoot.empty() ? recomp_save_initialize(recomp_disc_root_path)
                                    : recomp_save_initialize_storage(recomp_storage_root_path);
@@ -1501,7 +1562,7 @@ int main(int argc, char **argv)
     bool saveReady = saveInitialize();
     /* (a copy started over or again for online play: on Windows the copy before it is still ending as this one
        starts, its hold on the save journal (opened for itself alone) with it, so this one asks again a while) */
-    for (int tries = 0; !saveReady && (netFresh || netAgain) && tries < 100; ++tries) {
+    for (int tries = 0; !saveReady && (netFresh || netAgain || startedOver) && tries < 100; ++tries) {
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
         saveReady = saveInitialize();
         if (saveReady) std::fprintf(stderr, "online: the save journal opened after %d ms\n", (tries + 1) * 100);

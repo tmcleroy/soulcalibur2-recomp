@@ -481,3 +481,36 @@ none for 27 and 28, so the guests' weapons were drawn with their parts never pla
 both guests). Each guest's own program has its row: Link's two parts at 0x802518CC on the GameCube (its table's row
 27), Heihachi's two at 0x490960 on the PS2 (row 28). `runtime/sc2_guest.cpp` (`kWeaponParts`) puts them in the
 table when the guests load. Fights did not need them.
+
+## Their weapons as items of their own (2026-11-15, issue #77)
+
+A weapon 2-11 is an item, and the game's 298 items are all taken: the guest slot's ten (228-237) are Spawn's, and
+Link and Heihachi took those, so Weapon Master's shops and the Museum's Weapon Gallery had Spawn's alone.
+
+- **Items.** Each guest has ten past the game's (Link 400-409, Heihachi 410-419; `runtime/sc2_guest_items.c`), had
+  or not, a bit each, in the 20 bits of the save nothing uses: the 76th byte of the packed items (0x3BB1F0: the save
+  field is 76 bytes, 75 hold the 300 two-bit states), the unlock counters' 16th byte (0x3BB34C, 22 bytes: no call
+  names counter 15) and a bit of each of the states of items 298 and 299. So they are saved, loaded and sent to the
+  other player online with the save. The save's fields are a table at 0x331C30 ({kind, size, count, address, ...}).
+  Weapons had through Spawn's before are not carried over: there is no bit left to say a save has been.
+- **The shop** is a choice of the map's Command Menu (Start). Its list (0xF5760, 12-byte rows of {item, price} from
+  the shop's table) gets each guest's weapon after the guest slot's. The shop's step (0xFAEC0) and its help line
+  (0xF7850) take only items below 0x116: the item they get (0xF5D20, 0xF5DB0) is the guest slot's standing in for
+  the guest's, and the calls they make with it are given the guest's back.
+- **The Weapon Gallery** (0xE01B0) lists a table of 19 rows, {name, character, first text}, copied into an object
+  with room for 19 and no more; a weapon's name is text first + weapon of /2/399 and its description 0xFD further.
+  The Xbox's texts hold all three guests' (Link from 217, Heihachi 229, Spawn 241). The list is the game's rows
+  with the guests' after Spawn's; the object holds 19 of them and moves along the list as the cursor passes its ends
+  (`runtime/sc2_guest_gallery.c`).
+- **Weapon Master's select**: the box (0xB81B0 from 0xFA408) is a column wider and the cells half a column left.
+
+## The European disc's effect icons and the first data region (2026-11-15, issue #77)
+
+The European program shows each weapon's effects as icons on the Extra modes' weapon choice: a bit mask at +0x3C of
+the weapon's 0x40-byte record (0xFACD0 in that program), bit n the picture n of a bank of 31 that is the last part
+of /2/5, after the select screens' small icons. The game loads /2/5 into the first of its fixed data regions
+("SYSTEM_DATA", 0x14E000 bytes there; 0x140000 in the US program, whose /2/5 has no such bank). The European /2/5 is
+0x14B000 bytes and the guests' six small icons make it 0x152900, so its end was written over by the next region's
+contents and effect 27's picture was noise for every character. With the guests the European program's first region
+is 0x8000 longer and the next ("COMMON MOTION", 0x49000 to spare) starts that much later (`sc2_hooks.c`,
+`data_region`). The guests' file is unchanged.

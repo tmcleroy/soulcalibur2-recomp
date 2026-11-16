@@ -49,6 +49,11 @@ int sc2_guest_fifth_column(void);
 /* Nonzero when the select grid is laid out in rows of five, Random alone in the sixth (sc2_guest.cpp, BalanceGrid). */
 int sc2_select_grid_balanced(void);
 
+/* A guest's weapon 2-11 as an item of its own (sc2_guest_items.c), or -1 */
+int sc2_guest_weapon_item(uint32_t character, uint32_t weapon);
+/* Every guest's weapon had (the menu's Unlock everything) */
+void sc2_guest_items_all(void);
+
 /* The Art Gallery's Hi-Res pictures: 20, or more with the guests' (sc2_guest.cpp, ApplyGallery). */
 int sc2_guest_hires_pictures(void);
 

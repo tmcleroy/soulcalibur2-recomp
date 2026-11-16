@@ -14,7 +14,13 @@
    is kept here: its sprites made after 0xFA030 as its own loop makes them, two of the pool's unused slots (61,
    62) for their scale. Right from the grid's last column comes into it. While the cursor is there, the moves,
    the outfit and the choice are taken from 0xFA430 (its reads of the pad, 0xF1C70 held and 0xF1C40 pressed, have
-   those bits left out) and done here as it does them; Back stays its. */
+   those bits left out) and done here as it does them; Back stays its.
+
+   The grid's white box (0xB81B0 from 0xFA408: left, top 88, depth, width 376 = five cells of 72 and a margin of 8
+   each side, height 288, the width as the wide screen has it, 0x20270) is the game's five columns wide, and the
+   guests stood outside it (issue #77). With the column the box is a cell wider, and the cells and the cursor
+   (their offsets from the grid's corner, 0x188F24 and 0x188F28, read by this screen alone) half a cell to the
+   left: the six columns centred as the five were. */
 #include "sc2_hooks.h"
 #include "sc2_guest.h"
 #include "kernel_abi.h"
@@ -41,6 +47,9 @@ enum {
     UP = 0x2000u, DOWN = 0x1000u, LEFT = 0x800u, RIGHT = 0x400u, OUTFIT = 0x100u, CHOOSE = 0x8040u,
 };
 static const float GRID_X = 148.0f, GRID_Y = 112.0f;   /* 0xFA030's first cell */
+static const float BOX_WIDTH = 376.0f;                 /* the box's, five columns */
+static float cell_x, cursor_x;                         /* the offsets as the program has them (0 before the first build) */
+static bool wide;                                      /* the box takes the column in */
 
 static uint32_t guests[2];       /* the column: the guests the file has */
 static unsigned count;
@@ -56,6 +65,7 @@ extern void sub_000F3830(void);
 extern void sub_000F2510(void);
 extern void sub_000F1C40(void);
 extern void sub_000F1C70(void);
+extern void sub_000B81B0(void);
 
 static uint32_t bits(float f) { uint32_t u; memcpy(&u, &f, 4); return u; }
 static float constant(uint32_t address) { float f; memcpy(&f, recomp_memory(address, 4u), 4); return f; }
@@ -168,6 +178,15 @@ static void build(void)
     opening_on_guest = false;
     for (unsigned k = 0; k < 2u; ++k)
         if (27u + k == chosen) outfit[k] = (uint8_t)look;
+    /* (the six columns centred: every cell and the cursor half a cell left, the box a cell wider, box()) */
+    if (cell_x == 0.0f) {
+        cell_x = constant(CELL_X);
+        cursor_x = constant(CURSOR_X);
+    }
+    wide = sc2_guest_loaded(27u) || sc2_guest_loaded(28u);
+    const float shift = wide ? constant(STEP_X) * 0.5f : 0.0f;
+    *recomp_memory_u32(CELL_X) = bits(cell_x - shift);
+    *recomp_memory_u32(CURSOR_X) = bits(cursor_x - shift);
     sub_000FA030();
     build_column();
     if (opening_on_guest) {
@@ -300,6 +319,22 @@ static void cleared(void)
     in_column = false;
 }
 
+/* 0xB81B0(context, left, top, depth, width, height, ...): a menu box. The select's (from 0xFA408) a column wider
+   about the same centre, in the width's own scale (the wide screen's is narrower). */
+static void box(void)
+{
+    const uint32_t esp = recomp_runtime.registers.esp;
+    if (wide && *recomp_memory_u32(esp) == 0x000FA408u) {
+        float left, width;
+        memcpy(&left, recomp_memory(esp + 8u, 4u), 4u);
+        memcpy(&width, recomp_memory(esp + 0x14u, 4u), 4u);
+        const float more = width * constant(STEP_X) / BOX_WIDTH;
+        *recomp_memory_u32(esp + 8u) = bits(left - more * 0.5f);
+        *recomp_memory_u32(esp + 0x14u) = bits(width + more);
+    }
+    sub_000B81B0();
+}
+
 RecompFunction sc2_wm_select_lookup(uint32_t address)
 {
     switch (address) {
@@ -309,6 +344,7 @@ RecompFunction sc2_wm_select_lookup(uint32_t address)
     case 0x000f2510u: return cleared;
     case 0x000f1c70u: return held;
     case 0x000f1c40u: return pressed;
+    case 0x000b81b0u: return box;
     default: return NULL;
     }
 }

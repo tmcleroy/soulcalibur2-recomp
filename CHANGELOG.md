@@ -1,5 +1,23 @@
 # Changelog
 
+## Unreleased
+
+Fixes from the European disc and Linux test builds ([#77](https://github.com/tmcleroy/soulcalibur2-recomp/issues/77)).
+
+- **Link's and Heihachi's weapons in Weapon Master's shops and the Museum's Weapon Gallery**: each of their weapons
+  is for sale beside Spawn's and has its row in the gallery. They are now their own: a weapon bought for one guest
+  is no longer had by the other two, so **weapons Link and Heihachi had through Spawn's have to be bought again**
+  (or use *Unlock everything*). What is bought is kept in the game's own save.
+- **Weapon Master's character select**: its frame takes Link and Heihachi in, where they stood outside it.
+- **A weapon effect icon drawn as noise** (European disc, with the guests): one of the effect icons on the Extra
+  modes' weapon choice was a square of static for every character whose weapon has it.
+- **"Press B to delete unusable data" ended in a black screen**: the game left for the Xbox Dashboard, which is not
+  there. The save it cannot read (the other release's disc's) is now moved to a `saves set aside` folder beside the
+  saves and the game starts over.
+- **The in-game menu with a keyboard**: each key worked once, then not again until the window lost and regained the
+  keyboard (seen on Linux; the same on every system). A gamepad was not affected.
+- **Weapon Master above full speed**: starting a mission with the speed above Full stopped the game.
+
 ## 0.4.0-beta.1
 
 The bonus fighters unlock as on the Xbox, the menus' lettering in HD from the texture pack, weapon swing sounds, and

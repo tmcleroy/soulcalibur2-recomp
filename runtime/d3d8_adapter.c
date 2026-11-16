@@ -99,9 +99,17 @@ uint32_t sc2_frame_thread;
 
 void recomp_d3d8_submit(const RecompD3dPresenterCommand *command)
 {
+    /* (a frame shown after unshown ones can sample what those would have drawn: a scene change's picture of the
+       screen before it, never made. Such a draw is left out for a while after, where alone it would stop the game:
+       Weapon Master's missions at any speed above full.) */
+    static unsigned unshown_lately;
     if (sc2_fast_forward && command->type != RECOMP_D3D_PRESENTER_COMMAND_VISIBILITY_BEGIN &&
         command->type != RECOMP_D3D_PRESENTER_COMMAND_VISIBILITY_END &&
-        command->type != RECOMP_D3D_PRESENTER_COMMAND_DRAW_COVERAGE) return;
+        command->type != RECOMP_D3D_PRESENTER_COMMAND_DRAW_COVERAGE) {
+        unshown_lately = 100000u;
+        return;
+    }
+    if (unshown_lately) --unshown_lately;
     if ((command->type == RECOMP_D3D_PRESENTER_COMMAND_CLEAR && command->data.clear.clear_color &&
          !command->data.clear.target.offscreen) ||
         (command->type == RECOMP_D3D_PRESENTER_COMMAND_DRAW && !command->data.draw.target.offscreen)) {
@@ -109,6 +117,12 @@ void recomp_d3d8_submit(const RecompD3dPresenterCommand *command)
     }
     const RecompD3dPresenterError error = recomp_d3d_presenter_submit(presenter, command);
     if (error == RECOMP_D3D_PRESENTER_CLOSED) recomp_stop(0, "host-window-closed");
+    if (error != RECOMP_D3D_PRESENTER_OK && command->type == RECOMP_D3D_PRESENTER_COMMAND_DRAW && unshown_lately) {
+        static bool said;
+        if (!said) fprintf(stderr, "recomp d3d8: a draw after unshown frames left out (%u)\n", (unsigned)error);
+        said = true;
+        return;
+    }
     if (error != RECOMP_D3D_PRESENTER_OK) {
         recomp_stop(2, "d3d8:presenter:%u:command=%u:ret=%08x", (unsigned)error, (unsigned)command->type,
             *recomp_memory_u32(recomp_runtime.registers.esp));

@@ -204,9 +204,12 @@ run. Two runner options avoid that:
   its own picks, which a hook replaces.
 
 `SC2_TEST_KEYS=SWAP:WHAT,...` does at those Swaps what a key or the menu would:
-`save`, `load` (slot 1), `over` (start over), `record`, `replay`, `slow`, `pause`
+`save`, `load` (slot 1), `over` (start over), `record`, `replay`, `slow`, `turbo` (8x, for long menu walks; the save prompts at boot want `full` speed), `full`, `pause`
 (the free camera's freeze, for pictures), `unlock`, `start` (Start held on controller 1 for six reads:
 an Arcade win pose skipped at about Swap 3910 with `SC2_TEST_KO=1`).
+
+Weapon Master's map takes Start for its Command Menu (Weapon Select, Character Select, Shop, Save Data, Exit);
+its progress is saved only by Save Data. The yes/no prompts of the save screens open on No.
 
 Two more test aids: `SC2_TEST_KO=1` empties player 2's health in fights (an
 Arcade run to the ending takes about eight minutes headless), and

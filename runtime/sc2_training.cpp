@@ -41,6 +41,7 @@
      one, its recovery those after its last; the advantage, the frames
      between the attacker's being free again and the other's. */
 #include "sc2_training.h"
+#include "sc2_guest.h"
 #include "sc2_fighter.h"
 #include "sc2_panel.h"
 #include "sc2_state.h"
@@ -594,6 +595,7 @@ bool TrainingUnlockAll()
     for (uint32_t n = 0; n < kItemsPackedBytes; ++n)
         packed[n] = uint8_t((items[4u * n] & 3u) | (items[4u * n + 1u] & 3u) << 2 | (items[4u * n + 2u] & 3u) << 4 |
                             (items[4u * n + 3u] & 3u) << 6);
+    sc2_guest_items_all();   /* (Link's and Heihachi's weapons, items of their own) */
     TrainingNote("Everything unlocked (kept when the game saves)");
     return true;
 }
