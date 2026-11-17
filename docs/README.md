@@ -15,6 +15,6 @@ How the port works:
   PlayStation 2 discs, and where the game takes them in (select, Arcade, endings, weapons, Weapon Master, the Museum).
 - [online.md](online.md): connecting, rollback and lockstep, the in-game Online page, coming back after a drop, and
   what had to be made deterministic for two machines to play alike.
-- [RELEASING.md](RELEASING.md): CI, and how a release is built and published.
+- [RELEASING.md](RELEASING.md): CI, and the one command that builds and publishes a release (`tools/release/release.sh`).
 
 The pictures are in [screenshots](screenshots).

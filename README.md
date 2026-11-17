@@ -126,7 +126,9 @@ private/venv/bin/python tools/build_game.py app   # build/Soulcalibur II Recomp.
 
 Linux and Windows builds: `tools/release/linux.sh` and `tools/release/windows.sh` (in Docker); Android:
 `tools/release/android.sh` (the Android SDK and NDK; see the script). Generated code and
-everything taken from the disc stay in `private/`, which git ignores. How the port works is in [docs](docs/README.md).
+everything taken from the disc stay in `private/`, which git ignores. A release (every system's download, the tag
+and the GitHub release) is one command, `tools/release/release.sh minor`: [docs/RELEASING.md](docs/RELEASING.md).
+How the port works is in [docs](docs/README.md).
 
 ## Credits
 
