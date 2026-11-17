@@ -217,6 +217,10 @@ Arcade run to the ending takes about eight minutes headless), and
 had) at the title. Arcade's and VS Battle's character select is current scene
 10, a fight 7.
 
+`--export-pictures SWAP[:FOLDER]` runs the menu's Export pictures at that Swap (to FOLDER, or `pictures/` beside
+settings.ini), prints how many it wrote and ends the game (exit 1 when it failed): 72 from the US disc, 79 with
+both guests (`runtime/sc2_pictures.cpp`).
+
 ## A match
 
 As of 2026-10-29 Arcade plays a whole match on the Mac: character select,

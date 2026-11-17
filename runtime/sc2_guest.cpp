@@ -249,6 +249,13 @@ static void BalanceGrid()
     g_grid_balanced = true;
 }
 
+int32_t GalleryPicture(int gallery, int slot)
+{
+    if (gallery < 0 || gallery > 2 || slot < 0 || slot >= 45) return -1;
+    const int32_t picture = Get<int32_t>(kGallery + 8u * uint32_t(gallery * 45 + slot) + 4u);
+    return picture > 0 ? picture : -1;
+}
+
 bool GuestFileMatches(const char *path)
 {
     std::FILE *f = std::fopen(path, "rb");

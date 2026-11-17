@@ -58,7 +58,8 @@ leave). On it:
 - **Save state**, **Load state** and **Slot**: nine slots, kept while the game runs. A state loads in the scene it
   was saved in (the same fight, the same menu).
 - **Speed**: from 1/8 up to 8x.
-- **Training**, **Modes** (the endless battle), **Cheats** and **Online** pages (below), **Sound**, and **Quit game**.
+- **Training**, **Modes** (the endless battle), **Cheats**, **Online** and **Pictures** pages (below), **Sound**, and
+  **Quit game**.
 
 While playing (not online):
 
@@ -157,6 +158,14 @@ On the menu's Cheats page (off in an online match): *Player 1 takes no damage*, 
 *One-hit knockouts*, and *Unlock everything* (every character, stage, mode, weapon and Museum page; the game keeps
 them in your save the next time it saves).
 
+## Pictures
+
+The menu's Pictures page: *Export pictures* writes every picture of the Museum's Art Gallery (Hi-Res,
+Illustrations and Special, with the guests' when their file is in) as JPEG files to `pictures/` in your user folder
+(below), named by gallery and place (`hi-res-01.jpg`, `illustrations-43.jpg`, `special-10.jpg`), each at the size
+the disc holds it (512 by 512; Special's 388 by 512). It does not need the gallery unlocked. *Show pictures folder*
+opens that folder.
+
 ## Free camera and photo mode
 
 With the free camera on (launcher, Game page), \` (backquote) or a click of the right stick takes the game's camera;
@@ -226,7 +235,8 @@ More in [online.md](online.md).
 
 ## Where things are kept
 
-Settings (`settings.ini`, `launcher.ini`), saves, the guests' file and the textures are in your user folder:
+Settings (`settings.ini`, `launcher.ini`), saves, the guests' file, the textures and exported pictures are in your
+user folder:
 
 - macOS: `~/Library/Application Support/Soulcalibur II`
 - Linux: `~/.local/share/Soulcalibur II`

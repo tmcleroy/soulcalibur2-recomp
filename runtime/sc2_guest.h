@@ -30,6 +30,10 @@ bool ApplyGuestRoster(const char *path);
    root.olk, without the guests. */
 bool GuestFileMatches(const char *path);
 
+/* The Art Gallery's picture in a gallery's slot (0 Hi-Res, 1 Illustrations, 2 Special; 45 slots each): its /2
+   entry in root.olk, as the program's table has it now (with the guests' after ApplyGuestRoster), or -1 for none. */
+int32_t GalleryPicture(int gallery, int slot);
+
 } // namespace sc2
 
 extern "C" {
