@@ -1864,6 +1864,78 @@ static void general_fixed_stages(uint32_t device, const RecompD3dVertexLayout *l
     }
 }
 
+/* TEXTURETRANSFORMFLAGS on fixed-function vertices a pixel shader shades
+   (general_combiners): every stage's meshes keep their UVs in 0..1 and tile,
+   place and scroll them (floors, walls, water) with the stage's texture
+   matrix, COUNT2 over a UV set. The SDK's upload (0x34f7d0, case 0x220) makes
+   that s = u m00 + v m10 + m20, t = u m01 + v m11 + m21, which is done here
+   on a copy of the vertices: the general vertex shader passes UV sets as they
+   are. Returns the copy (the draw's vertices from then on), or NULL when no
+   set is transformed.
+   shortcut: a set two stages read through different matrices keeps its UVs
+   (none seen), as do COUNT3 and projected flags; generated coordinates
+   (TEXCOORDINDEX's high word) read no set and are not made here. */
+static uint8_t *transform_texcoords(uint32_t device, const RecompD3dVertexLayout *layout,
+    RecompD3dPresenterDrawCommand *draw)
+{
+    enum { UNUSED, PLAIN, TRANSFORMED, MIXED };
+    if (layout->pretransformed || layout->texcoord_count == 0u || layout->texcoord_count > 4u) return NULL;
+    uint32_t stage[4][32];
+    recomp_guest_load(stage, STAGES, sizeof stage);
+    float matrix[4][16];
+    uint32_t use[4] = {UNUSED, UNUSED, UNUSED, UNUSED};
+    bool any = false;
+    for (uint32_t i = 0u; i < RECOMP_D3D_PIXEL_STAGES && i < 4u; ++i) {
+        const uint32_t set = stage[i][28] & 0xffffu, flags = stage[i][21];
+        if (!draw->pixel_program.stages[i].sampled || (stage[i][28] >> 16u) != 0u ||
+            set >= layout->texcoord_count || (flags != 0u && flags != 2u))
+            continue;
+        float m[16];
+        bool identity = flags == 0u;
+        if (!identity) {
+            recomp_guest_load(m, device + 0x8c0u + i * 0x40u, sizeof m);
+            if (!isfinite(m[0]) || !isfinite(m[1]) || !isfinite(m[4]) || !isfinite(m[5]) ||
+                !isfinite(m[8]) || !isfinite(m[9]))
+                continue;
+            identity = m[0] == 1.0f && m[1] == 0.0f && m[4] == 0.0f && m[5] == 1.0f && m[8] == 0.0f && m[9] == 0.0f;
+        }
+        if (identity) {
+            use[set] = use[set] == UNUSED || use[set] == PLAIN ? PLAIN : MIXED;
+        } else if (use[set] == UNUSED) {
+            use[set] = TRANSFORMED;
+            memcpy(matrix[set], m, sizeof m);
+        } else if (use[set] != TRANSFORMED || memcmp(matrix[set], m, sizeof m) != 0) {
+            use[set] = MIXED;
+        }
+    }
+    for (uint32_t set = 0u; set < layout->texcoord_count; ++set) {
+        if (use[set] == MIXED) {
+            static bool reported;
+            if (!reported) fprintf(stderr, "recomp d3d8: a UV set read through two texture matrices keeps its UVs\n");
+            reported = true;
+        }
+        any = any || use[set] == TRANSFORMED;
+    }
+    if (!any) return NULL;
+    const size_t bytes = (size_t)draw->vertex_stride * draw->vertex_count;
+    uint8_t *out = malloc(bytes);
+    if (out == NULL) recomp_stop(2, "d3d8:texture-transform-allocation");
+    memcpy(out, draw->vertex_bytes, bytes);
+    for (uint32_t set = 0u; set < layout->texcoord_count; ++set) {
+        if (use[set] != TRANSFORMED) continue;
+        const float *m = matrix[set];
+        uint8_t *at = out + layout->texcoord_offset + set * 8u;
+        for (uint32_t v = 0u; v < draw->vertex_count; ++v, at += draw->vertex_stride) {
+            float uv[2];
+            memcpy(uv, at, sizeof uv);
+            const float st[2] = {uv[0] * m[0] + uv[1] * m[4] + m[8], uv[0] * m[1] + uv[1] * m[5] + m[9]};
+            memcpy(at, st, sizeof st);
+        }
+    }
+    draw->vertex_bytes = out;
+    return out;
+}
+
 /* The clip-space transform for a SetModelView composite. NV2A applies the
    composite to vertices and reads pixels of the (supersampled) target:
    pixel = (v C).xy / w + viewport origin, depth = (v C).z / w / zscale.
@@ -2156,14 +2228,16 @@ static void submit_draw(uint32_t primitive, uint32_t count, uint32_t vertices,
     /* Every other draw goes to the general pixel program, lit and fogged by
        general_lighting and general_fog instead of attach_lighting's
        recognised paths. */
-    uint8_t *expanded = NULL;
+    uint8_t *expanded = NULL, *transformed = NULL;
     if (points && (program || *recomp_memory_u32(device + PIXEL_HANDLE) != 0u)) {
         recomp_stop(2, "d3d8:draw-points-unbound");
     } else if (points) {
         expanded = point_sprites(device, &layout, draw);
     } else {
-        if (*recomp_memory_u32(device + PIXEL_HANDLE) != 0u) general_combiners(device, &layout, draw);
-        else general_fixed_stages(device, &layout, draw, program);
+        if (*recomp_memory_u32(device + PIXEL_HANDLE) != 0u) {
+            general_combiners(device, &layout, draw);
+            if (!program) transformed = transform_texcoords(device, &layout, draw);
+        } else general_fixed_stages(device, &layout, draw, program);
         if (!program) general_lighting(device, &layout, draw);
         general_fog(device, &layout, draw, program);
     }
@@ -2183,6 +2257,7 @@ static void submit_draw(uint32_t primitive, uint32_t count, uint32_t vertices,
     ++draw_submitted;
     free(sequential);
     free(expanded);
+    free(transformed);
     free(packed);
 }
 
