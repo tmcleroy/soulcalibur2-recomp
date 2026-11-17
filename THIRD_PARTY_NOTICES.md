@@ -32,6 +32,7 @@ the player downloaded themselves.
 | [SDL 3](https://github.com/libsdl-org/SDL) 3.4.16 | zlib ([SDL3.txt](docs/licenses/SDL3.txt)) | The game and the launcher: `libSDL3` beside them (the app's `Frameworks`, the Linux folder, `SDL3.dll`) |
 | [Dear ImGui](https://github.com/ocornut/imgui) 1.92.9b | MIT ([DearImGui.txt](docs/licenses/DearImGui.txt)) | The launcher, and the free camera's panel in the game |
 | [Inter](https://github.com/rsms/inter) | SIL Open Font License 1.1 ([Inter-OFL.txt](docs/licenses/Inter-OFL.txt)) | Compiled into the launcher |
+| [flag-icons](https://github.com/lipis/flag-icons) 7.2.3 (Panayiotis Lipiridis) | MIT ([flag-icons-MIT.txt](docs/licenses/flag-icons-MIT.txt)) | Every country's flag, `recomp-common/launcher/flags.png`, compiled into the launcher: the flags beside the names in the waiting room |
 | [SMAA](https://github.com/iryoku/smaa) (`71c806a`) | MIT ([SMAA.txt](docs/licenses/SMAA.txt)) | The game's anti-aliasing |
 | [shaderc](https://github.com/google/shaderc) (with glslang and SPIRV-Tools inside) | Apache-2.0 ([shaderc.txt](docs/licenses/shaderc.txt)) | Compiles the renderer's shaders: `libshaderc_shared` in the macOS app and the Windows and Linux folders |
 | [SPIRV-Cross](https://github.com/KhronosGroup/SPIRV-Cross) | Apache-2.0 ([SPIRV-Cross.txt](docs/licenses/SPIRV-Cross.txt)) | The macOS game: its shaders turned into Metal |

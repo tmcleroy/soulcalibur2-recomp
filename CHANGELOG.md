@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- **Input delay for the matches you host**: the launcher's Online page has an **Input delay** choice under Host (0 to
+  8 frames; 2 unless chosen), which the one who joins plays with too.
+- **Country flags in the waiting room**: choose **Your country** on the Online page (none unless you do), and the
+  others there see its flag and name beside yours. Flags from flag-icons (MIT).
+
 - **Export pictures** ([#82](https://github.com/tmcleroy/soulcalibur2-recomp/issues/82)): the menu's new Pictures
   page writes the Art Gallery's pictures (all three galleries, the guests' too) as JPEG files to `pictures/` in your
   user folder, and opens that folder.
