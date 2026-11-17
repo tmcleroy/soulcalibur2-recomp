@@ -614,11 +614,17 @@ static void black_band(const RecompD3dPresenterTarget *target, uint32_t top, uin
     RecompD3dPresenterCommand command = {.type = RECOMP_D3D_PRESENTER_COMMAND_DRAW};
     recomp_d3d_card_draw(&black, 1u, 1u, (float)target->color.width, (float)target->color.height, 1.0f, 0u, vertices,
         &command.data.draw);
-    const float w = (float)target->color.width, y0 = (float)top, y1 = (float)bottom;
-    vertices[0].x = 0.0f; vertices[0].y = y0;
-    vertices[1].x = w;    vertices[1].y = y0;
-    vertices[2].x = 0.0f; vertices[2].y = y1;
-    vertices[3].x = w;    vertices[3].y = y1;
+    /* The vertices are in legacy pixels, whose centres are on integers: row r is r - 0.5 to r + 0.5. With the
+       rows' own numbers the band sat half a line low, and above the Xbox's resolution the bottom bar's first half
+       line kept the clear's colour (a strip of the stage's backdrop colour under the picture). The band's outer
+       edges go past the target's. */
+    const float w = (float)target->color.width + 1.0f, x0 = -1.0f;
+    const float y0 = top == 0u ? -1.0f : (float)top - 0.5f;
+    const float y1 = bottom >= target->color.height ? (float)bottom + 1.0f : (float)bottom - 0.5f;
+    vertices[0].x = x0; vertices[0].y = y0;
+    vertices[1].x = w;  vertices[1].y = y0;
+    vertices[2].x = x0; vertices[2].y = y1;
+    vertices[3].x = w;  vertices[3].y = y1;
     command.data.draw.texture.data = 0xfff10000u; /* (its own texture key: not the boot cards') */
     command.data.draw.target = *target;
     recomp_d3d8_submit(&command);

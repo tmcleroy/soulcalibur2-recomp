@@ -2155,10 +2155,21 @@ static void submit_draw(uint32_t primitive, uint32_t count, uint32_t vertices,
     const float rect[6] = {(float)viewport.x, (float)viewport.y, (float)viewport.width,
         (float)viewport.height, viewport.min_z, viewport.max_z};
     memcpy(draw->viewport, rect, sizeof rect);
-    /* Program draws carry the offset in c59. */
+    /* Program draws carry the offset in c59. The device's offset is the API's
+       (SetScreenSpaceOffset: SC2 keeps -0.5, -0.5) plus the SDK's 0.53125
+       raster bias, in NV2A pixels, whose centres are half integers like the
+       host's. Pretransformed vertices are in legacy pixels (centres on
+       integers), which the presenter moves by half a pixel itself, so they
+       take the API offset alone. Vertices that go through a transform land
+       in host pixels already and take the whole offset, 1/32 of a pixel with
+       SC2's: with the API offset alone they sat half a pixel up and left, and
+       above the Xbox's resolution the screens' 2D art (the select and versus
+       screens' frames and fades, drawn through SetModelView) stopped half a
+       line short of the bottom edge, where the picture under it showed. */
     if (!program) {
         recomp_guest_load(draw->screen_space_offset, device + 0xad8u, sizeof draw->screen_space_offset);
-        for (uint32_t i = 0u; i < 2u; ++i) draw->screen_space_offset[i] -= 0.53125f;
+        if (layout.pretransformed)
+            for (uint32_t i = 0u; i < 2u; ++i) draw->screen_space_offset[i] -= 0.53125f;
     }
     const uint32_t scissors = *recomp_memory_u32(device + 0x17e0u);
     if (scissors > 1u || (scissors != 0u && *recomp_memory_u32(device + 0x17e4u) != 0u))

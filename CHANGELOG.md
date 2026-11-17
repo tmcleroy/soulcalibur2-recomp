@@ -11,6 +11,11 @@
   surface, where the game repeats it many times. They are now tiled, placed and scrolled as on the Xbox, so the
   stages are as sharp as the original's and their water moves.
 
+- **A thin strip along the bottom of the select and versus screens**: above the Xbox's resolution the last
+  half line of the picture showed the fighters' portraits without the screen's frame and fade over them. In a
+  match the black bars above and below the picture had a thin line of the stage's backdrop colour along their
+  edges. Both are gone.
+
 Fixes from the European disc and Linux test builds ([#77](https://github.com/tmcleroy/soulcalibur2-recomp/issues/77)).
 
 - **Link's and Heihachi's weapons in Weapon Master's shops and the Museum's Weapon Gallery**: each of their weapons
