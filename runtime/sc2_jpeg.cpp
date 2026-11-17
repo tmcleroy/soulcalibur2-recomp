@@ -156,7 +156,7 @@ std::vector<uint8_t> EncodeJpeg(const uint8_t *rgb, int width, int height, int q
     if (!made) {
         for (int x = 0; x < 8; x++) {
             for (int u = 0; u < 8; u++) {
-                cosines[x][u] = (u == 0 ? std::sqrt(0.5) : 1.0) * 0.5 * std::cos((2 * x + 1) * u * M_PI / 16);
+                cosines[x][u] = (u == 0 ? std::sqrt(0.5) : 1.0) * 0.5 * std::cos((2 * x + 1) * u * 3.14159265358979323846 / 16);
             }
         }
         made = true;
