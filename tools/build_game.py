@@ -9,6 +9,8 @@ the same name. Every replaced file is game-specific (addresses, layouts or
 game hooks for XDK 5455); docs/runtime.md lists them and why.
 
   tools/build_game.py lift     disassemble and lift private/disc/Default.xbe
+  tools/build_game.py current  lift only if the last lift is out of date (another lifter, runtime/ binding other
+                               functions, or no lift yet): what tools/release/release.sh runs
   tools/build_game.py build    merge the runtime and build the runner
   tools/build_game.py launcher build the launcher (launcher/)
   tools/build_game.py app      both, as build/Soulcalibur II Recomp.app (the launcher with the game beside it)
@@ -154,6 +156,18 @@ def lift():
     print("lifted: manifest %s, uninitialized EBP prologues %d" % (manifest[:12], ebp))
 
 
+def lift_is_current():
+    """The lift in PROGRAM is the one lift() would make now: same executable, lifter and bound functions."""
+    try:
+        receipt = json.loads((PROGRAM / "receipt.json").read_text())
+    except (OSError, ValueError):
+        return False
+    revision = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=LIFTER, text=True).strip()
+    return (receipt.get("xbe_sha256") == XBE_SHA256 and receipt.get("lifter_commit") == revision
+            and manual_list()[1] == receipt.get("manual_sha256")
+            and program_manifest(PROGRAM / "generated") == (receipt["manifest_sha256"], receipt["ebp_count"]))
+
+
 def merge():
     """build/src/recomp-runtime: shared files linked, runtime/ files replacing them."""
     src = build_dir("SC2_SRC_DIR", "src")
@@ -250,6 +264,11 @@ if __name__ == "__main__":
     step = sys.argv[1] if len(sys.argv) > 1 else "all"
     if step in ("lift", "all"):
         lift()
+    if step == "current":
+        if lift_is_current():
+            print("%s is current" % PROGRAM.relative_to(ROOT))
+        else:
+            lift()
     if step in ("build", "all", "app"):
         build()
     if step in ("launcher", "app"):
