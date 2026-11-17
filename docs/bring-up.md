@@ -163,6 +163,13 @@ the character profiles and the arcade ranking. What it took:
   combiner path passed the UV sets through, so every stage texture was drawn
   once across its mesh. The adapter now applies the matrix to a copy of the
   vertices. Checked against the GameCube disc in Dolphin (the same stage art).
+- Generated texture coordinates on the same vertices (2026-11-17, issue #23):
+  the shine on metal is a small environment map on stage 1 with
+  `TEXCOORDINDEX` CAMERASPACENORMAL or CAMERASPACEREFLECTIONVECTOR and COUNT2,
+  through the sphere map's matrix (0.5 g + 0.5, the stage's own texture matrix
+  at `+0x8c0 + 0x40 * stage`; the `+0xce0` block the DOA games use is zero
+  here). `transform_texcoords` makes the vector per vertex in camera space and
+  gives the stage a UV set of its own after the vertices'.
 
 Not yet: fixed-function lighting (lit draws use vertex colour), fog, specular
 (V1 reads zero), the back-buffer scale, C++ exception dispatch.
