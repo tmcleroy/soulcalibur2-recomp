@@ -1,26 +1,31 @@
 # Changelog
 
-## Unreleased
+## 0.5.0-beta.1
 
+The European disc on Windows and Linux and with the guests, online play with a chosen input delay and country flags,
+stages drawn sharp and moving as on the Xbox, the shine on metal, the Art Gallery's pictures as files, and fixes for
+Link's and Heihachi's weapons, the bonus fighters' endings and the European disc. Both players need this version to
+play each other online.
+
+- **The European disc on Windows and Linux, and with the guests** ([#60](https://github.com/tmcleroy/soulcalibur2-recomp/issues/60)):
+  the PAL disc plays on Windows and Linux as on the Mac (it stopped with "soulcalibur2-pal isn't here"), and Link
+  and Heihachi can be built for it too. Not yet on Android.
+- **Android: the guest discs' copy** shows its progress, and says why when it fails.
 - **Input delay for the matches you host**: the launcher's Online page has an **Input delay** choice under Host (0 to
   8 frames; 2 unless chosen), which the one who joins plays with too.
 - **Country flags in the waiting room**: choose **Your country** on the Online page (none unless you do), and the
   others there see its flag and name beside yours. Flags from flag-icons (MIT).
-
 - **Export pictures** ([#82](https://github.com/tmcleroy/soulcalibur2-recomp/issues/82)): the menu's new Pictures
   page writes the Art Gallery's pictures (all three galleries, the guests' too) as JPEG files to `pictures/` in your
   user folder, and opens that folder.
-
 - **Stage textures stretched and blurry** ([#23](https://github.com/tmcleroy/soulcalibur2-recomp/issues/23)): floors,
   walls, grass and water on almost every stage were drawn with one copy of their texture pulled across the whole
   surface, where the game repeats it many times. They are now tiled, placed and scrolled as on the Xbox, so the
   stages are as sharp as the original's and their water moves.
-
 - **A thin strip along the bottom of the select and versus screens**: above the Xbox's resolution the last
   half line of the picture showed the fighters' portraits without the screen's frame and fade over them. In a
   match the black bars above and below the picture had a thin line of the stage's backdrop colour along their
   edges. Both are gone.
-
 - **The shine on metal** ([#23](https://github.com/tmcleroy/soulcalibur2-recomp/issues/23)): armour, blades,
   shields and other polished surfaces have their reflection highlights, which follow the camera. They were drawn
   flat, the reflection picture stuck to the surface like paint.
