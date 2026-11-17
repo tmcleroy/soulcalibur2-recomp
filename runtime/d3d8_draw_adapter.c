@@ -1864,41 +1864,63 @@ static void general_fixed_stages(uint32_t device, const RecompD3dVertexLayout *l
     }
 }
 
-/* TEXTURETRANSFORMFLAGS on fixed-function vertices a pixel shader shades
-   (general_combiners): every stage's meshes keep their UVs in 0..1 and tile,
-   place and scroll them (floors, walls, water) with the stage's texture
-   matrix, COUNT2 over a UV set. The SDK's upload (0x34f7d0, case 0x220) makes
-   that s = u m00 + v m10 + m20, t = u m01 + v m11 + m21, which is done here
-   on a copy of the vertices: the general vertex shader passes UV sets as they
-   are. Returns the copy (the draw's vertices from then on), or NULL when no
-   set is transformed.
+/* Texture coordinates of fixed-function vertices a pixel shader shades
+   (general_combiners), made here on a copy of the vertices: the general
+   vertex shader passes UV sets as they are.
+
+   TEXTURETRANSFORMFLAGS COUNT2 over a UV set: every stage's meshes keep
+   their UVs in 0..1 and tile, place and scroll them (floors, walls, water)
+   with the stage's texture matrix. The SDK's upload (0x34f7d0, case 0x220)
+   makes that s = u m00 + v m10 + m20, t = u m01 + v m11 + m21.
+
+   Generated coordinates (TEXCOORDINDEX's high word, with COUNT2): the shine
+   on metal, armour, weapons and wet stone is a small environment map on
+   stage 1, looked up by the camera-space normal (1) or the camera-space
+   reflection vector (3); 2 is the camera-space position. The vector g goes
+   through the stage's texture matrix as (g, 1): SC2's is the sphere map's
+   0.5 g + 0.5. Each such stage gets a UV set of its own after the vertices'
+   (the FVF grows by one set, the stage reads it). The normal is taken to
+   camera space as the fixed-function pipeline does (the inverse transpose
+   of the model view, made unit length under NORMALIZENORMALS).
+
+   Returns the copy (the draw's vertices from then on), or NULL when nothing
+   is transformed or generated.
    shortcut: a set two stages read through different matrices keeps its UVs
-   (none seen), as do COUNT3 and projected flags; generated coordinates
-   (TEXCOORDINDEX's high word) read no set and are not made here. */
+   (none seen), as do COUNT3 and projected flags; a generated stage with
+   other flags, or with no room for another set, keeps the UV set it named. */
 static uint8_t *transform_texcoords(uint32_t device, const RecompD3dVertexLayout *layout,
     RecompD3dPresenterDrawCommand *draw)
 {
     enum { UNUSED, PLAIN, TRANSFORMED, MIXED };
-    if (layout->pretransformed || layout->texcoord_count == 0u || layout->texcoord_count > 4u) return NULL;
+    if (layout->pretransformed || layout->texcoord_count > 4u) return NULL;
     uint32_t stage[4][32];
     recomp_guest_load(stage, STAGES, sizeof stage);
-    float matrix[4][16];
+    float matrix[4][16], generated_matrix[4][16];
     uint32_t use[4] = {UNUSED, UNUSED, UNUSED, UNUSED};
+    uint32_t generated[4] = {0u, 0u, 0u, 0u}, generated_stage[4], generated_count = 0u;
     bool any = false;
     for (uint32_t i = 0u; i < RECOMP_D3D_PIXEL_STAGES && i < 4u; ++i) {
-        const uint32_t set = stage[i][28] & 0xffffu, flags = stage[i][21];
-        if (!draw->pixel_program.stages[i].sampled || (stage[i][28] >> 16u) != 0u ||
-            set >= layout->texcoord_count || (flags != 0u && flags != 2u))
-            continue;
+        const uint32_t set = stage[i][28] & 0xffffu, kind = stage[i][28] >> 16u, flags = stage[i][21];
+        if (!draw->pixel_program.stages[i].sampled || (flags != 0u && flags != 2u)) continue;
         float m[16];
-        bool identity = flags == 0u;
-        if (!identity) {
+        if (flags != 0u) {
             recomp_guest_load(m, device + 0x8c0u + i * 0x40u, sizeof m);
-            if (!isfinite(m[0]) || !isfinite(m[1]) || !isfinite(m[4]) || !isfinite(m[5]) ||
-                !isfinite(m[8]) || !isfinite(m[9]))
-                continue;
-            identity = m[0] == 1.0f && m[1] == 0.0f && m[4] == 0.0f && m[5] == 1.0f && m[8] == 0.0f && m[9] == 0.0f;
+            bool finite = true;
+            for (uint32_t k = 0u; k < 16u; ++k) finite = finite && (k % 4u > 1u || isfinite(m[k]));
+            if (!finite) continue;
         }
+        if (kind != 0u) {
+            if (flags != 2u || kind > 3u || layout->texcoord_count + generated_count >= 4u ||
+                (kind != 2u && layout->normal_offset == RECOMP_D3D_FVF_ABSENT))
+                continue;
+            generated[generated_count] = kind;
+            generated_stage[generated_count] = i;
+            memcpy(generated_matrix[generated_count++], m, sizeof m);
+            continue;
+        }
+        if (set >= layout->texcoord_count) continue;
+        const bool identity = flags == 0u ||
+            (m[0] == 1.0f && m[1] == 0.0f && m[4] == 0.0f && m[5] == 1.0f && m[8] == 0.0f && m[9] == 0.0f);
         if (identity) {
             use[set] = use[set] == UNUSED || use[set] == PLAIN ? PLAIN : MIXED;
         } else if (use[set] == UNUSED) {
@@ -1916,22 +1938,77 @@ static uint8_t *transform_texcoords(uint32_t device, const RecompD3dVertexLayout
         }
         any = any || use[set] == TRANSFORMED;
     }
-    if (!any) return NULL;
-    const size_t bytes = (size_t)draw->vertex_stride * draw->vertex_count;
-    uint8_t *out = malloc(bytes);
+    /* The model view, and the normals' way through it, for generated coordinates */
+    float eye[16], normal[16];
+    const bool unit = *recomp_memory_u32(0x0015e5c8u) != 0u;
+    if (generated_count != 0u) {
+        if (model_view_active) {
+            memcpy(eye, model_view, sizeof eye);
+        } else {
+            float world[16], view[16];
+            recomp_guest_load(world, device + 0x9c0u, sizeof world);
+            recomp_guest_load(view, device + 0x840u, sizeof view);
+            multiply(world, view, eye, "texgen-eye");
+        }
+        bool usable = true;
+        for (uint32_t k = 0u; k < 16u; ++k) usable = usable && isfinite(eye[k]);
+        /* (a model view with no inverse has no normals to look anything up by: the stage keeps its UV set) */
+        if (!usable || !(unit ? recomp_d3d_normal_adjugate(eye, normal, NULL) : recomp_d3d_normal_transform(eye, normal)))
+            generated_count = 0u;
+    }
+    if (!any && generated_count == 0u) return NULL;
+    /* (the vertices as their FVF lays them out: a stream's stride may be longer) */
+    const uint32_t old_stride = draw->vertex_stride < layout->stride ? draw->vertex_stride : layout->stride;
+    const uint32_t stride = layout->stride + generated_count * 8u;
+    uint8_t *out = malloc((size_t)stride * draw->vertex_count);
     if (out == NULL) recomp_stop(2, "d3d8:texture-transform-allocation");
-    memcpy(out, draw->vertex_bytes, bytes);
-    for (uint32_t set = 0u; set < layout->texcoord_count; ++set) {
-        if (use[set] != TRANSFORMED) continue;
-        const float *m = matrix[set];
-        uint8_t *at = out + layout->texcoord_offset + set * 8u;
-        for (uint32_t v = 0u; v < draw->vertex_count; ++v, at += draw->vertex_stride) {
+    const uint8_t *from = draw->vertex_bytes;
+    for (uint32_t v = 0u; v < draw->vertex_count; ++v) {
+        uint8_t *vertex = out + (size_t)v * stride;
+        memcpy(vertex, from + (size_t)v * draw->vertex_stride, old_stride);
+        for (uint32_t set = 0u; set < layout->texcoord_count; ++set) {
+            if (use[set] != TRANSFORMED) continue;
+            const float *m = matrix[set];
             float uv[2];
-            memcpy(uv, at, sizeof uv);
+            memcpy(uv, vertex + layout->texcoord_offset + set * 8u, sizeof uv);
             const float st[2] = {uv[0] * m[0] + uv[1] * m[4] + m[8], uv[0] * m[1] + uv[1] * m[5] + m[9]};
-            memcpy(at, st, sizeof st);
+            memcpy(vertex + layout->texcoord_offset + set * 8u, st, sizeof st);
+        }
+        if (generated_count == 0u) continue;
+        float p[3], n[3] = {0.0f, 0.0f, 0.0f}, e[3], c[3] = {0.0f, 0.0f, 0.0f};
+        memcpy(p, vertex + layout->position_offset, sizeof p);
+        for (uint32_t k = 0u; k < 3u; ++k) e[k] = p[0] * eye[k] + p[1] * eye[4u + k] + p[2] * eye[8u + k] + eye[12u + k];
+        if (layout->normal_offset != RECOMP_D3D_FVF_ABSENT) {
+            memcpy(n, vertex + layout->normal_offset, sizeof n);
+            for (uint32_t k = 0u; k < 3u; ++k) c[k] = n[0] * normal[k] + n[1] * normal[4u + k] + n[2] * normal[8u + k];
+            const float length = sqrtf(c[0] * c[0] + c[1] * c[1] + c[2] * c[2]);
+            if (unit && length > 0.0f) for (uint32_t k = 0u; k < 3u; ++k) c[k] /= length;
+        }
+        for (uint32_t g = 0u; g < generated_count; ++g) {
+            float vector[3];
+            if (generated[g] == 1u) {
+                memcpy(vector, c, sizeof vector);
+            } else if (generated[g] == 2u) {
+                memcpy(vector, e, sizeof vector);
+            } else {
+                /* the eye's ray to the vertex, mirrored in the normal */
+                const float length = sqrtf(e[0] * e[0] + e[1] * e[1] + e[2] * e[2]);
+                float ray[3] = {0.0f, 0.0f, 1.0f};
+                if (length > 0.0f) for (uint32_t k = 0u; k < 3u; ++k) ray[k] = e[k] / length;
+                const float d = 2.0f * (ray[0] * c[0] + ray[1] * c[1] + ray[2] * c[2]);
+                for (uint32_t k = 0u; k < 3u; ++k) vector[k] = ray[k] - d * c[k];
+            }
+            const float *m = generated_matrix[g];
+            float st[2] = {vector[0] * m[0] + vector[1] * m[4] + vector[2] * m[8] + m[12],
+                vector[0] * m[1] + vector[1] * m[5] + vector[2] * m[9] + m[13]};
+            if (!isfinite(st[0]) || !isfinite(st[1])) st[0] = st[1] = 0.0f;
+            memcpy(vertex + layout->stride + g * 8u, st, sizeof st);
         }
     }
+    for (uint32_t g = 0u; g < generated_count; ++g)
+        draw->pixel_program.stages[generated_stage[g]].texcoord = layout->texcoord_count + g;
+    draw->fvf += generated_count * 0x100u;
+    draw->vertex_stride = stride;
     draw->vertex_bytes = out;
     return out;
 }

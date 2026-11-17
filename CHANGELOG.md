@@ -16,6 +16,10 @@
   match the black bars above and below the picture had a thin line of the stage's backdrop colour along their
   edges. Both are gone.
 
+- **The shine on metal** ([#23](https://github.com/tmcleroy/soulcalibur2-recomp/issues/23)): armour, blades,
+  shields and other polished surfaces have their reflection highlights, which follow the camera. They were drawn
+  flat, the reflection picture stuck to the surface like paint.
+
 Fixes from the European disc and Linux test builds ([#77](https://github.com/tmcleroy/soulcalibur2-recomp/issues/77)).
 
 - **Link's and Heihachi's weapons in Weapon Master's shops and the Museum's Weapon Gallery**: each of their weapons
