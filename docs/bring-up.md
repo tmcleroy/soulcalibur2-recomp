@@ -156,6 +156,13 @@ the character profiles and the arcade ranking. What it took:
   sampled white).
 - Stencil shadow volumes write no colour (mask 0) and the shadow fill tests
   the stencil; both work in the presenter as is.
+- Texture matrices on fixed-function vertices that a pixel shader shades
+  (`transform_texcoords`, 2026-11-17, issue #23): stage meshes keep their UVs
+  in 0..1 and tile, place and scroll them with `TEXTURETRANSFORMFLAGS` COUNT2
+  and the stage's texture matrix (device `+0x8c0 + 0x40 * stage`). The
+  combiner path passed the UV sets through, so every stage texture was drawn
+  once across its mesh. The adapter now applies the matrix to a copy of the
+  vertices. Checked against the GameCube disc in Dolphin (the same stage art).
 
 Not yet: fixed-function lighting (lit draws use vertex colour), fog, specular
 (V1 reads zero), the back-buffer scale, C++ exception dispatch.

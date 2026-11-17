@@ -6,6 +6,11 @@
   page writes the Art Gallery's pictures (all three galleries, the guests' too) as JPEG files to `pictures/` in your
   user folder, and opens that folder.
 
+- **Stage textures stretched and blurry** ([#23](https://github.com/tmcleroy/soulcalibur2-recomp/issues/23)): floors,
+  walls, grass and water on almost every stage were drawn with one copy of their texture pulled across the whole
+  surface, where the game repeats it many times. They are now tiled, placed and scrolled as on the Xbox, so the
+  stages are as sharp as the original's and their water moves.
+
 Fixes from the European disc and Linux test builds ([#77](https://github.com/tmcleroy/soulcalibur2-recomp/issues/77)).
 
 - **Link's and Heihachi's weapons in Weapon Master's shops and the Museum's Weapon Gallery**: each of their weapons
