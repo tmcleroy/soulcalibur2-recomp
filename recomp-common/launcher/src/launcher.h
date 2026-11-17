@@ -8,6 +8,7 @@
 // compile definitions set by launcher.cmake: LAUNCHER_GAME_NAME, LAUNCHER_GAME_EXE, LAUNCHER_APP_ID,
 // LAUNCHER_HOME_ENV, LAUNCHER_DISCLAIMER.
 #pragma once
+#define RECOMP_LAUNCHER_SPECTATORS 1
 
 #include <SDL3/SDL.h>
 
@@ -83,6 +84,10 @@ struct Online {
     // Arcade while waiting: when the player switches it on ([online] arcade), Host adds `arcade_argument`, and the
     // host plays the game alone until the other player comes, who joins the game as it is. nullptr: no such switch.
     const char *arcade_argument = nullptr; // "--net-arcade"
+    // Input delay: the host's choice of frames each player's controls wait ([online] delay, 0 to 8, under Host), which
+    // Host and Invite add as `delay_argument N` when the player has chosen one (the game's own default otherwise); the
+    // game tells the one joining. nullptr: no such choice.
+    const char *delay_argument = nullptr; // "--net-delay"
     // Inviting a player from the waiting room (Collection::room): Host with `invite_argument THEIRS:MINE` (the two
     // players' ids) and `invite_name_argument NAME` (theirs), and the player's own name with `name_argument`; the match
     // isn't listed. nullptr: no Invite.
@@ -97,6 +102,8 @@ struct Online {
     // The game's id as the online service knows it (the invitations a game hosts say it), for a launcher of one game:
     // its game in the waiting room. A collection's games have theirs (CollectionGame::id).
     const char *game = nullptr;
+    const char *watch_argument = nullptr; // watch a running match by code
+    const char *spectators_argument = nullptr; // host opt-in to spectators
 };
 
 struct InfoRow {
@@ -183,6 +190,13 @@ struct Description {
     std::function<bool(const std::string &feature, const std::string &file)> feature_shown;
     // Optional: a game file near the program (a build inside the source tree), or ""
     std::function<std::string(const std::filesystem::path &program_folder)> find_nearby;
+    // Optional: where in the folder the download was unpacked to (recomp::InstallFolder, folders.h) this game's
+    // file may be: looked for when the launcher opens and the game has no file chosen, or the one it remembers is
+    // not usable. A release's `roms` folder, say, whose zips are a game's set. Tried in turn with `check`, as
+    // `candidates` are in a folder the player chose; the first that is usable becomes the game's file, unless the
+    // player chose one meanwhile. Read only. On a thread, once for each game that has none: a port that reads the
+    // whole folder should keep what it found.
+    std::function<std::vector<std::filesystem::path>(const std::filesystem::path &install_folder)> find_beside;
     // Optional, for a collection: where in a folder the player chose this game's file may be (the names a
     // collection of such files gives it), tried in turn with `check`
     std::function<std::vector<std::filesystem::path>(const std::filesystem::path &folder)> candidates;
@@ -231,7 +245,7 @@ const Description &describe();
 // ends, if they have it.
 struct CollectionGame {
     const char *id;          // short name: --play ID, --page ID, and its sections of the launcher.ini
-    const char *name;        // as the player reads it; its folder too (as LAUNCHER_GAME_NAME is a port's)
+    const char *name;        // as the player reads it; its folder too, unless `folder` says (as LAUNCHER_GAME_NAME is a port's)
     const char *exe;         // its program, beside the launcher (as LAUNCHER_GAME_EXE)
     const char *home_env;    // a variable naming a folder to use instead of its own, for tests (LAUNCHER_HOME_ENV)
     Description description; // what a launcher of its own is told (its pages, if any, are not shown)
@@ -239,6 +253,14 @@ struct CollectionGame {
     // with a page of their own are under one row of the sidebar, which opens and closes and has a page of the series'
     // games, and are kept together in the player's order and on the Games page.
     const char *series = nullptr;
+    // Its folder's name, when that is not `name` (a game given another name on the page, whose folder, with the
+    // player's settings and saves in it, stays the one it had); nullptr: `name`.
+    const char *folder = nullptr;
+    // When it came out, as "YYYY-MM-DD" (or "YYYY-MM", "YYYY"), for sorting the games by it; nullptr: not known (last)
+    const char *released = nullptr;
+    // The hardware it ran on, as the player reads it ("CV1000"), or nullptr. When the games name two or more, the
+    // Games page has a choice of which to list (all, or one of them), and the sidebar follows it.
+    const char *hardware = nullptr;
 };
 
 // A choice of a multi-game mode's: a row of its card on the Multi game page, kept in launcher.ini under

@@ -16,8 +16,8 @@
 //   GET  /v1/code/CODE                                             -> {game, title, version, protocol} | 404 (which game a code is
 //                                                                     for, while it can be joined: the launcher's Join)
 //   GET  /v1/lobby?protocol=N                                      -> {matches: [{game, title, version, code, name, waiting}]}
-//   POST /v1/room                {secret, name, games, protocol, version, invitable, blocked, lobby}
-//                                                                  -> {id, players: [{id, name, games}], invitations: [{code, from,
+//   POST /v1/room                {secret, name, country, games, protocol, version, invitable, blocked, lobby}
+//                                                                  -> {id, players: [{id, name, games, country}], invitations: [{code, from,
 //                                                                     name, game, title, version}], matches}   (the waiting room:
 //                                                                     below; with `lobby: true`, also every game's open matches,
 //                                                                     as GET /v1/lobby says them: one request for the Online page)
@@ -400,7 +400,7 @@ export class Room {
   constructor(state, env) {
     this.state = state;
     this.env = env;
-    this.players = new Map(); // id -> {name, games, protocol, version, invitable, blocked, seen}
+    this.players = new Map(); // id -> {name, country, games, protocol, version, invitable, blocked, seen}
     this.invitations = new Map(); // the invited player's id -> Map(code -> {from, name, game, title, version, seen})
   }
 
@@ -501,6 +501,8 @@ export class Room {
     const name = typeof body.name === "string" ? body.name.replace(/[\u0000-\u001f\u007f]/g, "").trim().slice(0, 24) : "";
     const me = {
       name,
+      // (the country the player chose to show with their name: two letters, or none; never worked out from anything)
+      country: typeof body.country === "string" && /^[A-Za-z]{2}$/.test(body.country) ? body.country.toUpperCase() : "",
       games: Array.isArray(body.games) ? body.games.filter((g) => typeof g === "string").map(cleanText).slice(0, 64) : [],
       protocol: Number(body.protocol) || 0,
       version: cleanText(body.version),
@@ -512,7 +514,7 @@ export class Room {
     const players = [];
     for (const [other, player] of this.players) {
       if (other !== id && player.invitable && player.protocol === me.protocol && player.version === me.version && !this.apart(id, other)) {
-        players.push({ id: other, name: player.name, games: player.games });
+        players.push({ id: other, name: player.name, games: player.games, ...(player.country ? { country: player.country } : {}) });
       }
     }
     players.sort((a, b) => a.name.localeCompare(b.name));

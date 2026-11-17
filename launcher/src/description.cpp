@@ -278,6 +278,7 @@ const launcher::Description &launcher::describe() {
         d.online.room = "https://soulcalibur2-online.tmcleroy.workers.dev/v1/room";
         d.online.room_protocol = 1001;
         d.online.game = "soulcalibur2";
+        d.online.delay_argument = "--net-delay"; // (the host's, sent to the one who joins: runtime/sc2_netplay.cpp)
         d.online_page = true;            // (online play on its own page, after Game)
         d.own_pages_after_game = true;   // (Game, Online, then Guest and Textures)
         d.bindings = sc2::BindingTable();
