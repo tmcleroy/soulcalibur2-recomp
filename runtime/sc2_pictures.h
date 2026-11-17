@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
-/* Export pictures (the menu's Pictures page, issue #82): the Art Gallery's pictures as JPEG files. */
+/* Export pictures (the menu's Pictures page, issue #82): the Art Gallery's pictures as PNG files. */
 #ifndef SC2_PICTURES_H
 #define SC2_PICTURES_H
 
@@ -16,7 +16,7 @@ void SetPicturesRootOlk(const std::string &host_path);
 std::string PicturesFolder(const std::string &settings_path);
 
 /* Every picture the Art Gallery has (its three galleries as the program's table has them now, the guests' with them)
-   written to `folder` as <gallery>-<NN>.jpg: the number of files written, or -1 with `error` saying why. */
+   written to `folder` as <gallery>-<NN>.png: the number of files written, or -1 with `error` saying why. */
 int ExportPictures(const std::string &folder, std::string &error);
 
 /* The folder in the system's file manager */

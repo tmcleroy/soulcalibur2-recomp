@@ -189,7 +189,7 @@ void Configure()
         "save the next time it saves."});
     const std::string pictures = PicturesFolder(settings_path);
     config.commands.push_back({"Pictures", "Export pictures",
-        "Writes the Art Gallery's pictures (Hi-Res, Illustrations and Special, the guests' with them) as JPEG files to " +
+        "Writes the Art Gallery's pictures (Hi-Res, Illustrations and Special, the guests' with them) as PNG files to " +
             pictures + " (the pictures folder in your files: the launcher's YOUR FILES). Files already there are "
             "written over."});
     config.commands.push_back({"Pictures", "Show pictures folder",

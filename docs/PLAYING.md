@@ -161,8 +161,8 @@ them in your save the next time it saves).
 ## Pictures
 
 The menu's Pictures page: *Export pictures* writes every picture of the Museum's Art Gallery (Hi-Res,
-Illustrations and Special, with the guests' when their file is in) as JPEG files to `pictures/` in your user folder
-(below), named by gallery and place (`hi-res-01.jpg`, `illustrations-43.jpg`, `special-10.jpg`), each at the size
+Illustrations and Special, with the guests' when their file is in) as PNG files to `pictures/` in your user folder
+(below), named by gallery and place (`hi-res-01.png`, `illustrations-43.png`, `special-10.png`), each exactly as
 the disc holds it (512 by 512; Special's 388 by 512). It does not need the gallery unlocked. *Show pictures folder*
 opens that folder.
 

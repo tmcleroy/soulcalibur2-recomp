@@ -17,6 +17,7 @@ the player downloaded themselves.
 | musl's math (sin, cos, atan2, log2, expm1) | MIT ([docs/licenses/musl.txt](docs/licenses/musl.txt)) | `runtime/x87_math/`, so the game's x87 arithmetic gives the same results on every system |
 | The online service | GPL-3.0-or-later | `online/`, from cps2recomp's `online/` (the same author) |
 | [xxHash](https://github.com/Cyan4973/xxHash) 0.8.2 (Yann Collet) | BSD-2-Clause ([xxHash.txt](docs/licenses/xxHash.txt)) | `third_party/doa2u-re/recomp-runtime/xxhash.h`: texture packs' names (the game) |
+| [stb_image_write](https://github.com/nothings/stb) 1.16 (Sean Barrett) | Public domain or MIT (its end) | `runtime/stb/stb_image_write.h`: the PNG files of the menu's Export pictures |
 
 ## Submodules
 

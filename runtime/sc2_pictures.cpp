@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
-/* Export pictures (sc2_pictures.h). Facts from the disc (docs/guests.md has the Art Gallery's table):
+/* Export pictures (sc2_pictures.h): PNG files, the disc's pixels exactly. Facts from the disc (docs/guests.md has the Art Gallery's table):
 
    - The Art Gallery's table (sc2_guest.cpp, GalleryPicture) gives each slot of its three galleries (Hi-Res,
      Illustrations, Special) the /2 entry of root.olk that holds its picture. Read from memory, it has the guests'
@@ -12,7 +12,11 @@
      Rows and columns at the edges that are wholly transparent are left out. */
 #include "sc2_pictures.h"
 #include "sc2_guest.h"
-#include "sc2_jpeg.h"
+
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#define STBI_WRITE_NO_STDIO
+#define STB_IMAGE_WRITE_STATIC
+#include "stb/stb_image_write.h"
 
 #include "disc_image.h"
 extern "C" {
@@ -115,8 +119,9 @@ size_t Swizzled(uint32_t x, uint32_t y, uint32_t width, uint32_t height)
     return out;
 }
 
-/* A picture's VXT as JPEG bytes, or empty when it is not one this can read */
-std::vector<uint8_t> PictureJpeg(const std::vector<uint8_t> &vxt)
+/* A picture's VXT as PNG bytes (RGB, or RGBA when any of it is partly transparent), or empty when it is not one this
+   can read */
+std::vector<uint8_t> PicturePng(const std::vector<uint8_t> &vxt)
 {
     if (vxt.size() < 0x14 + 0x24 || std::memcmp(vxt.data(), "VXT.", 4) != 0 || vxt[4] != 2 || Word(&vxt[8]) < 1u)
         return {};
@@ -141,16 +146,28 @@ std::vector<uint8_t> PictureJpeg(const std::vector<uint8_t> &vxt)
     }
     if (left >= right || top >= bottom) return {};
     const uint32_t w = right - left, h = bottom - top;
-    std::vector<uint8_t> rgb(size_t(w) * h * 3u);
+    bool opaque = true;
+    for (uint32_t y = top; y < bottom && opaque; ++y)
+        for (uint32_t x = left; x < right && opaque; ++x) opaque = texel(x, y)[3] == 255u;
+    const uint32_t channels = opaque ? 3u : 4u;
+    std::vector<uint8_t> pixels(size_t(w) * h * channels);
     for (uint32_t y = 0; y < h; ++y) {
         for (uint32_t x = 0; x < w; ++x) {
             const uint8_t *p = texel(left + x, top + y);   /* B, G, R, A */
-            uint8_t *q = &rgb[(size_t(y) * w + x) * 3u];
-            /* (what is partly transparent, over black, as the gallery shows it) */
-            for (int c = 0; c < 3; ++c) q[c] = uint8_t(p[2 - c] * p[3] / 255u);
+            uint8_t *q = &pixels[(size_t(y) * w + x) * channels];
+            q[0] = p[2];
+            q[1] = p[1];
+            q[2] = p[0];
+            if (channels == 4u) q[3] = p[3];
         }
     }
-    return EncodeJpeg(rgb.data(), int(w), int(h), 95);
+    std::vector<uint8_t> png;
+    stbi_write_png_compression_level = 9;
+    stbi_write_png_to_func([](void *to, void *data, int size) {
+        auto *out = static_cast<std::vector<uint8_t> *>(to);
+        out->insert(out->end(), static_cast<uint8_t *>(data), static_cast<uint8_t *>(data) + size);
+    }, &png, int(w), int(h), int(channels), pixels.data(), int(w * channels));
+    return png;
 }
 
 } // namespace
@@ -195,17 +212,17 @@ int ExportPictures(const std::string &folder, std::string &error)
                 vxt.resize(size);
                 if (!read(at, vxt.data(), size)) vxt.clear();
             }
-            const std::vector<uint8_t> jpeg = PictureJpeg(vxt);
-            if (jpeg.empty()) {
+            const std::vector<uint8_t> png = PicturePng(vxt);
+            if (png.empty()) {
                 ++unread;
                 std::fprintf(stderr, "recomp sc2: pictures: %s %d (/2/%d) could not be read\n", kGalleries[gallery],
                     number, int(picture));
                 continue;
             }
             char name[64];
-            std::snprintf(name, sizeof name, "%s-%02d.jpg", kGalleries[gallery], number);
+            std::snprintf(name, sizeof name, "%s-%02d.png", kGalleries[gallery], number);
             std::ofstream file(std::filesystem::u8path(folder) / name, std::ios::binary);
-            file.write(reinterpret_cast<const char *>(jpeg.data()), std::streamsize(jpeg.size()));
+            file.write(reinterpret_cast<const char *>(png.data()), std::streamsize(png.size()));
             if (file) ++written;
             else ++failed;
         }

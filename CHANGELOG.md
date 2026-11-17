@@ -3,7 +3,7 @@
 ## Unreleased
 
 - **Export pictures** ([#82](https://github.com/tmcleroy/soulcalibur2-recomp/issues/82)): the menu's new Pictures
-  page writes the Art Gallery's pictures (all three galleries, the guests' too) as JPEG files to `pictures/` in your
+  page writes the Art Gallery's pictures (all three galleries, the guests' too) as PNG files to `pictures/` in your
   user folder, and opens that folder.
 
 Fixes from the European disc and Linux test builds ([#77](https://github.com/tmcleroy/soulcalibur2-recomp/issues/77)).
