@@ -48,6 +48,7 @@ extern void sub_00056A00(void);
 extern void sub_00055010(void);
 extern void sub_00046550(void);
 extern void sub_00146610(void);
+extern void sub_0006A1F0(void);
 /* memmove (0x146610; memcpy calls it too): the C library's, copied natively. Its last bytes go through small jump
    tables, and on the European disc (0x14B810) the lift lost the arm for none left (the table at 0x14BAA8 reads from
    -7 to 0 and slot 0 was not found), so a copy ending on a whole dword stopped the game ("unresolved indirect call
@@ -210,6 +211,45 @@ static void cell_place(void)
     *f -= step * 0.5f;
     /* (with the grid in rows of five, Random, cell 26 in the second column, stands alone under the middle one) */
     if (cell == 26u && sc2_select_grid_balanced()) *f += step;
+}
+
+/* 0x6A1F0, a select cell's setup (thiscall: ECX the cell, +0x90 its row in the grid [0x3CA00C], 36 bytes a cell,
+   the character at +0). A character of -1 is an empty cell: not drawn, and the cursors pass over it. The Museum's
+   Character Profiles (mode 15) and Character Ending (mode 16) have nothing for the bonus fighters (Lizardman,
+   Assassin, Berserker: 30-32), and showed them greyed, as if still to be unlocked; there their cells are empty, as
+   on the other consoles, and are given back for every other select (museum_grid, from here and each frame). */
+static struct { int cell; int16_t character; } museum_hidden[3];
+static int museum_hidden_count;
+
+static void museum_grid(bool hide)
+{
+    const uint32_t grid = *recomp_memory_u32(0x003CA00Cu);
+    if (!grid) return;
+    if (!hide) {
+        for (int k = 0; k < museum_hidden_count; ++k)
+            *(int16_t *)recomp_memory(grid + 36u * (uint32_t)museum_hidden[k].cell, 2u) = museum_hidden[k].character;
+        museum_hidden_count = 0;
+        return;
+    }
+    for (int cell = 0; cell < 30 && museum_hidden_count < 3; ++cell) {
+        int16_t *character = (int16_t *)recomp_memory(grid + 36u * (uint32_t)cell, 2u);
+        if (*character < 30 || *character > 32) continue;
+        museum_hidden[museum_hidden_count].cell = cell;
+        museum_hidden[museum_hidden_count++].character = *character;
+        *character = -1;
+    }
+}
+
+static bool museum_select_mode(void)
+{
+    const uint16_t mode = *(const uint16_t *)recomp_memory(0x0039895Eu, 2u);
+    return mode == 15u || mode == 16u;
+}
+
+static void cell_setup(void)
+{
+    museum_grid(museum_select_mode());
+    sub_0006A1F0();
 }
 
 /* 0x6B000(player, pressed), a select cursor's move (thiscall: the cursor's cell at +8, the cells it may take +4 to
@@ -634,6 +674,7 @@ static void box_frame(void)
 /* 0x32630, the frame routine's (0x2DD40) first call: the start of a frame (sc2_frame.cpp) */
 static void frame_begins(void)
 {
+    if (museum_hidden_count && !museum_select_mode()) museum_grid(false);   /* (the Museum's select left) */
     sc2_frame_begins();
     sub_00032630();
 }
@@ -694,6 +735,7 @@ RecompFunction recomp_sc2_hooks_lookup_manual(uint32_t address)
     case 0x000502a0u: return scene_switch;
     case 0x0002abc0u: return sprite_draw;
     case 0x0006a190u: return cell_place;
+    case 0x0006a1f0u: return cell_setup;
     case 0x0006b000u: return cursor_move;
     case 0x000698d0u: return character_available_bonus;
     case 0x000566f0u: return weapon_item;

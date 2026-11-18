@@ -6,8 +6,11 @@ Fixes from players' reports.
 
 - **The Museum's Character Ending and the bonus fighters** ([#91](https://github.com/tmcleroy/soulcalibur2-recomp/issues/91)):
   Lizardman, Assassin and Berserker have no endings of their own, but with Heihachi's last weapons had (or everything
-  unlocked from the menu) the Museum offered Lizardman's, and choosing it showed nothing. Their places there stay
-  locked. Clearing Arcade with Lizardman also no longer gives Heihachi a weapon.
+  unlocked from the menu) the Museum offered Lizardman's, and choosing it showed nothing. Clearing Arcade with Lizardman also no longer gives Heihachi a weapon.
+- **The bonus fighters in the Museum** ([#96](https://github.com/tmcleroy/soulcalibur2-recomp/issues/96)):
+  Lizardman, Assassin and Berserker are left out of Character Profiles' and Character Ending's character select (their
+  cells empty, as on the other consoles). They have neither a profile nor an ending; Character Ending showed them
+  greyed, as if still to be unlocked, and Character Profiles let them be chosen.
 - **Inferno against Link and Heihachi** ([#90](https://github.com/tmcleroy/soulcalibur2-recomp/issues/90)): the
   final boss fought both guests in the style it has for Spawn. It now takes the form each guest's own disc has for
   them (the GameCube's for Link, the PlayStation 2's for Heihachi). **Build the guests again** on the launcher's
