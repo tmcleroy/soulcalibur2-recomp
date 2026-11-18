@@ -40,7 +40,7 @@ keyboard's usual keys (Controllers page to change them, player 1 shown):
 | Left and right triggers | E, R | triggers |
 | Start | Return | Start |
 
-F11 switches full screen. Start, A, B, Return or Space skips the logos and the opening movie.
+F11 or Alt+Enter switches full screen. Start, A, B, Return or Space skips the logos and the opening movie.
 
 On Android, a touch shows the touch controls: a stick at the left (it comes to where your thumb lands), the four
 attack buttons at the right in the Xbox pad's places and colours (B vertical at the top, A horizontal at the left, K
@@ -52,14 +52,19 @@ Android's Back button opens the in-game menu.
 
 ## The in-game menu
 
-Esc, F1 or a gamepad's Back opens it over the paused game (not during an online match: Esc then asks whether to
-leave). On it:
+Esc, F1, Android's Back, or a gamepad's Guide, left stick click, Back or Start and Back together opens it over the
+paused game (not during an online match: Esc then asks whether to leave; Esc and Back only when no player has them as
+a control). The same close it from any page; Backspace or B goes back a page. The arrows, the d-pad or the left stick
+choose (held, they repeat), Enter, Space or A confirm; the mouse works it too (a click chooses, the right button goes
+back, the wheel moves). On it, as in the other ports:
 
+- **Online** (below), **Display** (the shader, HD textures, the FPS counter) and **Game**: the **Speed** (from 1/8 up
+  to 8x), **Mute**, and the **Cheats** and **Pictures** pages (below).
+- **Alternative modes**: **Training mode** (below) and the endless battle.
 - **Save state**, **Load state** and **Slot**: nine slots, kept while the game runs. A state loads in the scene it
   was saved in (the same fight, the same menu).
-- **Speed**: from 1/8 up to 8x.
-- **Training**, **Modes** (the endless battle), **Cheats**, **Online** and **Pictures** pages (below), **Sound**, and
-  **Quit game**.
+- **Reset all options** (every option back to the launcher's Enhanced preset, the speed to full), **Reset game** (the
+  game started again as if switched off and on: the window closes and opens again), **Quit game** and **Resume**.
 
 While playing (not online):
 
@@ -68,22 +73,22 @@ While playing (not online):
 | F5 / F9 | Save a state in the slot / load it |
 | F6 / F7 | The slot before / after |
 | P | Pause, and go on again |
-| . | While paused: one frame on (held: frame after frame) |
+| O (or .) | While paused: one frame on (held: frame after frame) |
 | H | While paused: hide the life bars, timer and names |
 | Backspace | Start the round over |
 | - / = | Slower / faster again |
 
-![The menu's Training page](screenshots/menu-training.png)
+![The menu's Training mode page](screenshots/menu-training.png)
 
 ## Training
 
-On the menu's Training page (and the launcher's Features page). The hit boxes, frame data, input display and combo
+On the menu's Training mode page, under Alternative modes (and the launcher's Features page). The hit boxes, frame data, input display and combo
 readout show in Practice; start over, the dummy and the aids work in any fight.
 
 | | |
 | --- | --- |
 | Start over | The round again as its fighting began (Backspace). |
-| Health refill | A fighter's health fills again once a combo is over. |
+| Health refills | A fighter's health fills again once a combo is over. |
 | Infinite time | The round's clock stays where it started. |
 | Input display | What each fighter holds, newest at the top, down their side: for how many frames, the direction in numpad notation from their own side (6 is towards the other fighter), and the buttons (A, B, K, G). |
 | Hit boxes | The fighters' own collision shapes, as the game tests them: where each can be hit (blue circles), its pushing sphere (green), and its weapon and limbs (lines), red while its attack is live. The game doesn't say which of them strikes, so all turn red. |
@@ -106,7 +111,7 @@ Practice mode's own options (the dummy's guard and actions, its attack data) are
 | Resolution | Draws the game at 1x to 8x the Xbox's 640x480 (above 4x needs a fast graphics card) |
 | Shader | The picture through one of RetroArch's shaders (below); also in the in-game menu |
 | FPS counter | Frames shown each second, top right; also in the in-game menu |
-| Health refill, Infinite time, Input display, Combo readout, Hit boxes, Frame data | Training, as in the menu |
+| Health refills, Infinite time, Input display, Combo readout, Hit boxes, Frame data | Training, as in the menu |
 | No damage (each player), One-hit knockouts | Cheats, as in the menu |
 | Ping, Input delay, Hide names | What an online match shows |
 
@@ -148,19 +153,19 @@ textures** is on (the Features page, Graphics, or the in-game menu: it switches 
 
 ## Endless battle
 
-On the menu's Modes page: in any fight (Practice, VS Battle, Arcade...), the game plays both fighters for as long as
+On the menu's Alternative modes page: in any fight (Practice, VS Battle, Arcade...), the game plays both fighters for as long as
 you like, with no knockouts, no clock and no bars. Touch a fighter's controls to take it over; five seconds after you
 let go, the game has it again. It stays on the fight's stage, and is off when the game starts.
 
 ## Cheats
 
-On the menu's Cheats page (off in an online match): *Player 1 takes no damage*, *Player 2 takes no damage*,
+On the menu's Cheats page, under Game (off in an online match): *Player 1 takes no damage*, *Player 2 takes no damage*,
 *One-hit knockouts*, and *Unlock everything* (every character, stage, mode, weapon and Museum page; the game keeps
 them in your save the next time it saves).
 
 ## Pictures
 
-The menu's Pictures page: *Export pictures* writes every picture of the Museum's Art Gallery (Hi-Res,
+The menu's Pictures page, under Game: *Export pictures* writes every picture of the Museum's Art Gallery (Hi-Res,
 Illustrations and Special, with the guests' when their file is in) as JPEG files to `pictures/` in your user folder
 (below), named by gallery and place (`hi-res-01.jpg`, `illustrations-43.jpg`, `special-10.jpg`), each at the size
 the disc holds it (512 by 512; Special's 388 by 512). It does not need the gallery unlocked. *Show pictures folder*
@@ -180,7 +185,7 @@ the same again gives it back.
 | Back to where it started | R | Y |
 | Turn to a fighter (each in turn) | \\ | d-pad left |
 | **Pause the game** (the camera flies on; P pauses with the camera off too) | P | Start |
-| Step one frame while paused | . | White |
+| Step one frame while paused | O or . | White |
 | Hide the life bars, timer and names (the fight's black bands go too: the picture fills the screen) | H | Black |
 | Screenshot (in Pictures/Soulcalibur II) | F12 | d-pad right |
 

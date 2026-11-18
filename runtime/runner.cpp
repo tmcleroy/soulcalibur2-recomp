@@ -595,6 +595,18 @@ void OnlineHost()
     std::fprintf(stderr, "online: hosting from the menu\n");
 }
 
+void StartGameAgain()
+{
+    if (netplay) {
+        netplay->Leave(); // (hosting: the code stops working, as Stop hosting does)
+        netplay.reset();
+    }
+    std::fprintf(stderr, "recomp sc2: the game starts again (Reset game)\n");
+    std::vector<std::string> args = argsAgain();
+    args.push_back("--started-over"); // (on Windows this copy may still hold the save journal as the new one opens it)
+    startAgain(args);
+}
+
 void OnlineJoin(const std::string &match)
 {
     std::vector<std::string> args = argsAgain();

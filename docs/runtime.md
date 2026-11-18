@@ -14,7 +14,7 @@ name, which replaces it. Each replacement is game-specific:
 | --- | --- |
 | `program_manual.c` | Manual bindings at SC2's 5455 addresses; DOA2U's are its game hooks |
 | `runner.cpp` | DOA2U's runner without its profile unlocks, Story finale and dedication card |
-| `free_camera_adapter.c` | SC2's camera components (0x1CC50, 0x1CCB0) and its controls; the pause (P, . a frame) with the camera off too |
+| `free_camera_adapter.c` | SC2's camera components (0x1CC50, 0x1CCB0) and its controls; the pause (P; O or . a frame) with the camera off too |
 | `sc2_frame.cpp` | the start of each frame: the menu's save states, the free camera's freeze, the speeds above full |
 | `scene_freeze_adapter.c` | the free camera's freeze (the frame put back each frame from a save state, `sc2_frame.cpp`, `sc2_state.cpp`) and clean view (the 2D layer 0x331B0, the menus' sprites 0x2ABC0 and boxes 0x2ED80 and 0x2EC90 left out, `sc2_hooks.c`) |
 | `dsound_api_adapter.c`, `dsound_buffer_adapter.c`, `dsound_effects_adapter.c` | DOA2U's at SC2's 5455 addresses; SC2 adds GetEffectData, SetLFO and SetEG and links no 3D, stream or speaker-config API |

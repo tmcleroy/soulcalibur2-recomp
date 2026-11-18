@@ -87,7 +87,7 @@ const std::vector<recomp::FeatureInfo> &Features()
             0, {"English", "Deutsch", "Fran\u00e7ais", "Espa\u00f1ol", "Italiano"}},
         {"fps_counter", "Graphics", "FPS counter",
             "The frames shown each second, in the top right corner. The game runs at 60.", 0, {}},
-        {"health_refill", "Training", "Health refill",
+        {"health_refill", "Training", "Health refills",
             "A fighter's health fills again once a combo is over (when it has stayed put for a moment).", 0, {}},
         {"infinite_time", "Training", "Infinite time", "The round's clock stays where it started.", 0, {}},
         {"input_display", "Training", "Input display",

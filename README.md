@@ -63,7 +63,7 @@ connection waits for the other player to come back with the same code. See [docs
 ## Free camera and photo mode
 
 Switched on in the launcher: \` (backquote) or a click of the right stick takes the game's camera and flies it,
-in fights and menus. P (or Start while flying) **pauses** the fight while the camera goes on flying; . (or White)
+in fights and menus. P (or Start while flying) **pauses** the fight while the camera goes on flying; O or . (or White)
 steps a frame; H (or Black) hides the life bars and timer; F12 saves a screenshot.
 
 | | |
@@ -79,8 +79,8 @@ steps a frame; H (or Black) hides the life bars and timer; F12 saves a screensho
   lines, or your own preset.
 - **An endless battle**: in any fight, the game plays both fighters for as long as you like (touch the controls to
   take one over).
-- **An in-game menu** (Esc, F1 or a gamepad's Back): save states, speed, training, cheats (no damage, one-hit
-  knockouts, everything unlocked), online, sound, quit.
+- **An in-game menu** (Esc, F1, a gamepad's Guide or Back), laid out as the other ports': online, display, the speed,
+  sound, cheats (no damage, one-hit knockouts, everything unlocked), training mode, save states, reset and quit.
 - **Android**: the launcher and the game in one app for 64-bit phones and tablets (Android 10 or later, Vulkan),
   with touch controls (a stick, the four attack buttons, Start and the menu) beside any gamepad.
 - **A launcher** that checks your disc, builds the guests, sets features and both players' keys and buttons, hosts
