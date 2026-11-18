@@ -25,6 +25,10 @@ double GameSpeed();
    folder beside settings.ini; it says how many on stderr and the game ends (stop "export-pictures", 1 on a failure). */
 void ExportPicturesAt(const std::string &spec);
 
+/* Reset game (the menu's): this copy of the game replaced by a new one with the same arguments, as if the Xbox were
+   switched off and on (runner.cpp, as joining a match from the menu starts it again) */
+[[noreturn]] void StartGameAgain();
+
 /* Tests (SC2_TEST_KEYS SWAP:start): reads of controller 1 still to be given Start, counted down by the runner */
 extern int test_start_reads;
 

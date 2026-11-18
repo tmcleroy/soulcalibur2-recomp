@@ -1,9 +1,10 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
-/* The in-game menu. Esc or F1, or a gamepad's Back, open it after a Swap; the
-   game stays paused there (its next frame waits) and its sound with it, while
-   the menu draws itself over a copy of the frame the window showed
-   (recomp_d3d_presenter_read_frame) and the presenter shows that picture
-   instead. A key or button the player gave the game does only that. */
+/* The in-game menu, laid out and worked as every port's (recomp-common menu_layout.h and menu_sdl.h). Esc or F1,
+   Android's Back, a gamepad's Guide, its left stick's click, its Back or Start and Back together open it after a
+   Swap, and close it again from any page; Backspace and B go back a page. The game stays paused there (its next
+   frame waits) and its sound with it, while the menu draws itself over a copy of the frame the window showed
+   (recomp_d3d_presenter_read_frame) and the presenter shows that picture instead. A key or button the player gave
+   the game does only that. */
 #include "sc2_menu.h"
 #include "d3d_texture_replace.h"
 #include "sc2_touch.h"
@@ -15,6 +16,8 @@
 #include "sc2_version.h"
 #include "sc2_training.h"
 #include "../recomp-common/menu.h"
+#include "../recomp-common/menu_layout.h"
+#include "../recomp-common/menu_sdl.h"
 
 #include "audio_output.h"
 #include "d3d8_adapter.h"
@@ -33,11 +36,13 @@ extern "C" {
 #include <SDL3/SDL.h>
 
 #include <algorithm>
+#include <atomic>
 #include <filesystem>
 #include <chrono>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <mutex>
 #include <thread>
 #include <vector>
 
@@ -104,20 +109,10 @@ void SetFeatureValue(const std::string &name, int value)
     else if (name == "online_hide_names") online.hide_names = value != 0;
 }
 
-/* The speeds the menu offers (- and = too), slowest first, as cps2recomp's: the game's frames to the display's */
-struct Speed {
-    const char *name;
-    int frames, ticks;
-};
-constexpr Speed kSpeedTable[] = {{"1/8", 1, 8}, {"1/6", 1, 6}, {"1/4", 1, 4}, {"1/3", 1, 3}, {"1/2", 1, 2}, {"3/4", 3, 4},
-    {"Full", 1, 1}, {"1.5x", 3, 2}, {"2x", 2, 1}, {"3x", 3, 1}, {"4x", 4, 1}, {"6x", 6, 1}, {"8x", 8, 1}};
-constexpr int kFullSpeed = 6;
-constexpr int kSpeedCount = static_cast<int>(sizeof kSpeedTable / sizeof kSpeedTable[0]);
-const std::vector<std::string> kSpeeds = [] {
-    std::vector<std::string> names;
-    for (const Speed &one : kSpeedTable) names.push_back(one.name);
-    return names;
-}();
+/* The speeds the menu offers (- and = too), slowest first, as every port's (layout::kSpeeds): the game's frames to
+   the display's */
+constexpr int kFullSpeed = recomp::layout::kFull;
+constexpr int kSpeedCount = recomp::layout::kSpeedCount;
 int speed = kFullSpeed;
 
 /* The menu's commands, by their place in MenuConfig::commands */
@@ -140,23 +135,26 @@ struct Shot {
     std::string keys, path;
 } shot;
 
+/* The page a feature is on in the menu: the standard pages' names for this port's categories (the launcher keeps
+   its own headings: Graphics, Training, Modes) */
+std::string MenuCategory(const std::string &category)
+{
+    if (category == "Graphics") return recomp::layout::kDisplay;
+    if (category == "Training") return recomp::layout::kTraining;
+    if (category == "Modes") return recomp::layout::kModes; /* (Endless battle, beside Training mode) */
+    return category;
+}
+
 void Configure()
 {
+    namespace layout = recomp::layout;
     recomp::MenuConfig config;
-    config.groups = {
-        {recomp::MenuRow(recomp::MenuRow::Resume)},
-        {recomp::MenuRow(recomp::MenuRow::Save), recomp::MenuRow(recomp::MenuRow::Load),
-            recomp::MenuRow(recomp::MenuRow::Slot), recomp::MenuRow(recomp::MenuRow::Speed)},
-        {recomp::MenuRow(recomp::MenuRow::Pages)},
-        {recomp::MenuRow(recomp::MenuRow::Mute)},
-        {recomp::MenuRow(recomp::MenuRow::Quit)},
-    };
     const auto &features = Features();
     menu_features.clear();
     for (size_t i = 0; i < features.size(); ++i) {
         if (FeatureValue(features[i].name) < 0) continue;
         menu_features.push_back(i);
-        config.features.push_back({features[i].category, features[i].title, features[i].description,
+        config.features.push_back({MenuCategory(features[i].category), features[i].title, features[i].description,
             features[i].choices});
     }
     config.value = [](size_t feature) { return FeatureValue(Features()[menu_features[feature]].name); };
@@ -173,18 +171,18 @@ void Configure()
     };
     /* Online's page: hosting a match from here (cps2recomp's menu has it), or stopping */
     if (OnlineHosting())
-        config.commands.push_back({"Online", "Stop hosting",
+        config.commands.push_back({layout::kOnline, "Stop hosting",
             "Others can no longer join: the match's code stops working. Your game goes on as it is."});
     else
-        config.commands.push_back({"Online", "Host a match",
+        config.commands.push_back({layout::kOnline, "Host a match",
             "Others can join you online while you play on as you like: the match's code is on the screen to give "
             "them, and with your name from the launcher's Online page it's in the lobby too. When someone joins, "
             "the game starts over for the match. This row again stops hosting."});
     listed.clear();
-    config.commands.push_back({"Training", "Start over",
+    config.commands.push_back({layout::kTraining, "Start over",
         "The round again as its fighting began (Backspace while playing). Kept once a round's clock starts moving, "
         "or in Practice as its fighting begins."});
-    config.commands.push_back({"Cheats", "Unlock everything",
+    config.commands.push_back({layout::kCheats, "Unlock everything",
         "Every character, stage, mode, weapon and Museum page the game unlocks, had now. The game keeps them in your "
         "save the next time it saves."});
     const std::string pictures = PicturesFolder(settings_path);
@@ -195,33 +193,56 @@ void Configure()
     config.commands.push_back({"Pictures", "Show pictures folder",
         "Opens " + pictures + " (where Export pictures writes) in your file manager."});
     if (OnlineCanHost()) {
-        config.commands.push_back({"Online", "Join with a code",
+        config.commands.push_back({layout::kOnline, "Join with a code",
             "Type the code the host's game shows (or the host's address) and press Return: the game starts again and "
             "joins their match."});
         std::vector<OpenMatch> now;
         const bool came = OnlineLobby(now);
         listed = now;
-        if (!came) config.commands.push_back({"Online", "Open matches: looking...", "The lobby's open matches show here."});
+        if (!came) config.commands.push_back({layout::kOnline, "Open matches: looking...", "The lobby's open matches show here."});
         else if (now.empty())
-            config.commands.push_back({"Online", "Open matches: none right now",
+            config.commands.push_back({layout::kOnline, "Open matches: none right now",
                 "Matches players host in the lobby show here (the list is asked for again each time the menu opens)."});
         for (const OpenMatch &one : now) {
             const bool same = one.version == SC2_VERSION;
-            config.commands.push_back({"Online", (same ? "Join " : "(") + (one.name.empty() ? one.code : one.name) +
+            config.commands.push_back({layout::kOnline, (same ? "Join " : "(") + (one.name.empty() ? one.code : one.name) +
                     (same ? "" : ": version " + one.version + ")"),
                 same ? "Their match in the lobby (code " + one.code + "): the game starts again and joins it."
                      : "Their game is version " + one.version + " and yours " SC2_VERSION ": both need the same to play."});
         }
     }
-    config.speeds = kSpeeds;
-    config.normalSpeed = kFullSpeed;
-    config.speedDescription = "Slows the game down or speeds it up (- and = while playing). P pauses it, and . goes on a "
-                              "frame.";
+    layout::Speeds(config);
+    /* (layout::kSpeedDescription's words, with the Xbox for the board) */
+    config.speedDescription = "Left/Right: slow motion, or faster than the Xbox. While playing, P stops the game and "
+                              "starts it again; O goes on by one frame; - and = change the speed.";
     config.muted = [] { return recomp_audio_output_muted() != 0; };
     config.setMuted = [](bool muted) { recomp_audio_output_set_muted(muted ? 1 : 0); };
-    config.confirmName = "A or Return";
-    config.closeName = escape_free ? "Esc or Back" : "F1 or Back";
+    config.confirmName = recomp::sdl::kConfirmName;
+    config.closeName = recomp::sdl::kCloseName;
+    layout::Rows rows;
+    rows.resetDescription = "Starts the game again, as if switched off and on: the window closes and opens again, "
+                            "and the game reads your save as it last saved it.";
+    layout::Standard(config, rows);
+    /* (under Game, after Cheats, as satrecomp has it) */
+    config.pages.push_back({"Pictures", layout::kGame,
+        "Export the Art Gallery's pictures as JPEG files, and show the folder they go to.", false});
     menu.Configure(std::move(config));
+}
+
+/* Reset all options: every feature as the launcher's default preset (Enhanced) has it, in settings.ini and, for
+   those the menu changes while playing, now (cps2recomp's ResetFeatures). The menu puts the speed back to full. */
+void ResetOptions()
+{
+    const auto &features = Features();
+    recomp::Ini ini(settings_path);
+    if (!settings_path.empty()) ini.load();
+    recomp::SetPreset(ini, features, "enhanced");
+    const std::vector<int> values = recomp::FeatureValues(ini, features);
+    for (size_t i = 0; i < features.size() && i < values.size(); ++i) {
+        const int now = FeatureValue(features[i].name);
+        if (now >= 0 && now != values[i]) SetFeatureValue(features[i].name, values[i]);
+    }
+    if (!settings_path.empty()) ini.save();
 }
 
 /* The keys while the menu is open. A key's press is kept until the keys are next sampled (so that a quick tap between
@@ -245,34 +266,139 @@ bool KeyHeld(uint32_t code)
     return code < RECOMP_INPUT_SCANCODE_COUNT && menu_keys[code] != 0u;
 }
 
-/* The menu's buttons held now: the arrows, Return or Space, Esc or Backspace;
-   a gamepad's d-pad or left stick, South, East, Back or Start. */
-unsigned Held()
+/* The menu's buttons held now (menu_sdl.h's MenuHeld, from the keys the menu samples and the runtime's gamepads): the
+   arrows, Return (not with Alt: full screen), Space or keypad Enter, Backspace; a gamepad's d-pad or left stick,
+   South, East. */
+unsigned Held(uint64_t pad)
 {
     const auto key = [](SDL_Scancode code) { return KeyHeld(code); };
-    const uint64_t pad = recomp_input_host_pad_buttons();
     const auto button = [&](SDL_GamepadButton b) { return (pad >> b & 1u) != 0u; };
     unsigned held = 0;
     if (key(SDL_SCANCODE_UP) || button(SDL_GAMEPAD_BUTTON_DPAD_UP)) held |= recomp::kMenuUp;
     if (key(SDL_SCANCODE_DOWN) || button(SDL_GAMEPAD_BUTTON_DPAD_DOWN)) held |= recomp::kMenuDown;
     if (key(SDL_SCANCODE_LEFT) || button(SDL_GAMEPAD_BUTTON_DPAD_LEFT)) held |= recomp::kMenuLeft;
     if (key(SDL_SCANCODE_RIGHT) || button(SDL_GAMEPAD_BUTTON_DPAD_RIGHT)) held |= recomp::kMenuRight;
-    if (key(SDL_SCANCODE_RETURN) || key(SDL_SCANCODE_SPACE) || button(SDL_GAMEPAD_BUTTON_SOUTH))
+    if ((key(SDL_SCANCODE_RETURN) && !(SDL_GetModState() & SDL_KMOD_ALT)) || key(SDL_SCANCODE_SPACE) ||
+        key(SDL_SCANCODE_KP_ENTER) || button(SDL_GAMEPAD_BUTTON_SOUTH))
         held |= recomp::kMenuConfirm;
-    if (key(SDL_SCANCODE_ESCAPE) || key(SDL_SCANCODE_BACKSPACE) || key(SDL_SCANCODE_F1) || key(SDL_SCANCODE_AC_BACK) ||
-        button(SDL_GAMEPAD_BUTTON_EAST) || button(SDL_GAMEPAD_BUTTON_BACK) || button(SDL_GAMEPAD_BUTTON_START))
-        held |= recomp::kMenuBack;
+    if (key(SDL_SCANCODE_BACKSPACE) || button(SDL_GAMEPAD_BUTTON_EAST)) held |= recomp::kMenuBack;
     return held;
 }
 
-/* What opens it: F1, Esc and a gamepad's Back while the game has not got them, and Android's Back. */
+/* What closes the menu at once from any page (each as a bit, for its press): Esc, F1, Android's Back (menu_sdl.h's
+   MenuKey; Tab is the game's here), a gamepad's Guide or left stick's click (MenuButton), its Back (which opens it
+   when no player has it), and Start and Back together (MenuChord). */
+enum : unsigned { kCloseEsc = 1, kCloseF1 = 2, kCloseAcBack = 4, kCloseGuide = 8, kCloseStick = 16, kCloseBack = 32,
+    kCloseChord = 64 };
+unsigned CloseHeld(uint64_t pad)
+{
+    const auto button = [&](SDL_GamepadButton b) { return (pad >> b & 1u) != 0u; };
+    unsigned held = 0;
+    held |= KeyHeld(SDL_SCANCODE_ESCAPE) ? kCloseEsc : 0u;
+    held |= KeyHeld(SDL_SCANCODE_F1) ? kCloseF1 : 0u;
+    held |= KeyHeld(SDL_SCANCODE_AC_BACK) ? kCloseAcBack : 0u;
+    held |= button(SDL_GAMEPAD_BUTTON_GUIDE) ? kCloseGuide : 0u;
+    held |= button(SDL_GAMEPAD_BUTTON_LEFT_STICK) ? kCloseStick : 0u;
+    held |= back_free && button(SDL_GAMEPAD_BUTTON_BACK) ? kCloseBack : 0u;
+    held |= button(SDL_GAMEPAD_BUTTON_START) && button(SDL_GAMEPAD_BUTTON_BACK) ? kCloseChord : 0u;
+    return held;
+}
+
+/* What opens it: F1, Android's Back, a gamepad's Guide or left stick's click, Start and Back together; Esc and a
+   gamepad's Back alone while no player has been given them. */
 bool OpenHeld()
 {
     if (OnlineInMatch()) return false; /* (the match would wait for the menu: Esc asks to leave, runner.cpp) */
     const uint64_t pad = recomp_input_host_pad_buttons();
+    const auto button = [&](SDL_GamepadButton b) { return (pad >> b & 1u) != 0u; };
     return recomp_input_scancode_held(SDL_SCANCODE_F1) || recomp_input_scancode_held(SDL_SCANCODE_AC_BACK) ||
-        (escape_free && recomp_input_scancode_held(SDL_SCANCODE_ESCAPE)) ||
-        (back_free && (pad >> SDL_GAMEPAD_BUTTON_BACK & 1u) != 0u);
+        (escape_free && recomp_input_scancode_held(SDL_SCANCODE_ESCAPE)) || button(SDL_GAMEPAD_BUTTON_GUIDE) ||
+        button(SDL_GAMEPAD_BUTTON_LEFT_STICK) || (back_free && button(SDL_GAMEPAD_BUTTON_BACK)) ||
+        (button(SDL_GAMEPAD_BUTTON_START) && button(SDL_GAMEPAD_BUTTON_BACK));
+}
+
+/* The mouse in the menu. The presenter takes the window's events from SDL's queue itself (doa2u-re's pumpEvents),
+   so the mouse's are copied here as they come (an event watch, called as SDL queues them, on the thread that pumps)
+   while the menu is open, and handed to the menu each time round its loop. */
+std::mutex mouse_lock;
+std::vector<SDL_Event> mouse_events;
+std::atomic<bool> mouse_wanted{false};
+
+bool SDLCALL MouseWatch(void *, SDL_Event *event)
+{
+    if (!mouse_wanted) return true;
+    switch (event->type) {
+    case SDL_EVENT_MOUSE_MOTION:
+    case SDL_EVENT_MOUSE_BUTTON_DOWN:
+    case SDL_EVENT_MOUSE_WHEEL: {
+        std::lock_guard<std::mutex> hold(mouse_lock);
+        if (mouse_events.size() < 256u) mouse_events.push_back(*event);
+        break;
+    }
+    default: break;
+    }
+    return true;
+}
+
+/* Where the presenter shows the menu's picture in a window (d3d_backend_show_image's place, in the window's pixels):
+   the game's aspect (16:9 with widescreen, else 4:3), as large as the window allows, in its middle, black around */
+recomp::sdl::MenuPlace PictureIn(SDL_Window *window, uint32_t width, uint32_t height)
+{
+    recomp::sdl::MenuPlace place;
+    place.width = static_cast<int>(width);
+    place.height = static_cast<int>(height);
+    int swap_width = 0, swap_height = 0;
+    if (window == nullptr || !SDL_GetWindowSizeInPixels(window, &swap_width, &swap_height) || swap_width <= 0 ||
+        swap_height <= 0)
+        return place;
+    const char *wide = std::getenv("RECOMP_D3D_WIDESCREEN");
+    const float aspect = wide != nullptr && wide[0] != '\0' && std::strcmp(wide, "0") != 0 ? 16.0f / 9.0f : 4.0f / 3.0f;
+    int x = 0, y = 0, w = swap_width, h = swap_height;
+    if (static_cast<float>(swap_width) / swap_height > aspect) {
+        w = static_cast<int>(swap_height * aspect + 0.5f);
+        x = (swap_width - w) / 2;
+    } else {
+        h = static_cast<int>(swap_width / aspect + 0.5f);
+        y = (swap_height - h) / 2;
+    }
+    place.x = static_cast<float>(x);
+    place.y = static_cast<float>(y);
+    place.w = static_cast<float>(w);
+    place.h = static_cast<float>(h);
+    return place;
+}
+
+/* Alt+Enter switches full screen, as F11 does (the presenter's): taken out of SDL's queue (an event filter) so that
+   Return, player 1's Start, doesn't press Start too. Not on Android (no window to switch, its pump on a thread). */
+bool SDLCALL KeyFilter(void *, SDL_Event *event)
+{
+    static bool taken = false; /* (the Return taken: its letting go is taken too) */
+    if ((event->type != SDL_EVENT_KEY_DOWN && event->type != SDL_EVENT_KEY_UP) || event->key.scancode != SDL_SCANCODE_RETURN)
+        return true;
+    if (event->type == SDL_EVENT_KEY_DOWN && (event->key.mod & SDL_KMOD_ALT)) {
+        if (!event->key.repeat) {
+            if (SDL_Window *window = SDL_GetWindowFromID(event->key.windowID))
+                SDL_SetWindowFullscreen(window, (SDL_GetWindowFlags(window) & SDL_WINDOW_FULLSCREEN) == 0);
+        }
+        taken = true;
+        return false;
+    }
+    if (event->type == SDL_EVENT_KEY_UP && taken) {
+        taken = false;
+        return false;
+    }
+    return true;
+}
+
+void WatchEvents()
+{
+    static bool watching = false;
+    if (watching) return;
+    watching = true;
+    SDL_AddEventWatch(MouseWatch, nullptr);
+#if !defined(__ANDROID__)
+    SDL_SetEventFilter(KeyFilter, nullptr);
+#endif
 }
 
 void SaveBmp(const std::string &path, const std::vector<uint32_t> &pixels, uint32_t width, uint32_t height)
@@ -347,53 +473,24 @@ void Run(bool scripted)
     menu.SetSpeed(speed);
     menu.Open();
     sc2_touch_set_menu(true);
+    {
+        std::lock_guard<std::mutex> hold(mouse_lock);
+        mouse_events.clear();
+    }
+    mouse_wanted = !scripted;
+    /* (tests: SC2_TEST_MENU_CLICK=X,Y, below) */
+    const char *test_click = scripted ? std::getenv("SC2_TEST_MENU_CLICK") : nullptr;
     unsigned frames_open = 0;
     bool lobby_shown = false;
     SampleMenuKeys();
-    unsigned previous = scripted ? 0u : Held(); /* the press that opened it is not a menu press */
+    /* (the press that opened it is not a menu press: what is held now counts once let go and pressed again) */
+    recomp::MenuRepeat repeat;
+    uint64_t pad = recomp_input_host_pad_buttons();
+    repeat.Step(scripted ? 0u : Held(pad));
+    unsigned close_before = scripted ? 0u : CloseHeld(pad);
     size_t script = 0u;
-    while (menu.IsOpen()) {
-        unsigned pressed = 0u;
-        SampleMenuKeys();
-        if (scripted) {
-            if (script < shot.keys.size()) {
-                switch (shot.keys[script++]) {
-                case 'u': pressed = recomp::kMenuUp; break;
-                case 'd': pressed = recomp::kMenuDown; break;
-                case 'l': pressed = recomp::kMenuLeft; break;
-                case 'r': pressed = recomp::kMenuRight; break;
-                case 'c': pressed = recomp::kMenuConfirm; break;
-                case 'b': pressed = recomp::kMenuBack; break;
-                default: break;
-                }
-            }
-        } else {
-            const unsigned held = Held();
-            pressed = held & ~previous;
-            previous = held;
-        }
-        /* (typing a code to join: the keys are the code's; Return joins, Esc goes back to the menu) */
-        if (typing_code) {
-            pressed = 0u;
-            const int typed = TypedKey();
-            if (typed == '\n' && !typed_code.empty()) OnlineJoin(typed_code);
-            if (typed == 27) {
-                typing_code = false;
-                menu.Note("");
-            } else {
-                if (typed == '\b' && !typed_code.empty()) typed_code.pop_back();
-                else if (typed > ' ' && typed_code.size() < 40u) typed_code += static_cast<char>(typed);
-                menu.Note("Code: " + typed_code + "_   (Return joins, Esc goes back)");
-            }
-            previous = Held();
-        }
-        /* (the lobby's matches, once they have come) */
-        std::vector<OpenMatch> now;
-        if (!typing_code && !lobby_shown && OnlineCanHost() && ++frames_open % 15u == 0u && OnlineLobby(now)) {
-            lobby_shown = true;
-            Configure();
-        }
-        const recomp::Menu::Chosen chosen = menu.Buttons(pressed);
+    /* What the menu returned, done */
+    const auto act = [&](const recomp::Menu::Chosen &chosen) {
         if (chosen.kind == recomp::Menu::Chosen::Command && chosen.id == kJoinCode) {
             typing_code = true;
             typed_code.clear();
@@ -406,6 +503,11 @@ void Run(bool scripted)
             else if (which < listed.size()) OnlineJoin(listed[which].code);
         }
         if (chosen.kind == recomp::Menu::Chosen::Quit) recomp_stop(0, "menu-quit");
+        if (chosen.kind == recomp::Menu::Chosen::Reset) StartGameAgain();
+        if (chosen.kind == recomp::Menu::Chosen::ResetOptions) {
+            ResetOptions();
+            menu.Note("Every option is back as it first was.");
+        }
         if (chosen.kind == recomp::Menu::Chosen::Save || chosen.kind == recomp::Menu::Chosen::Load) {
             /* (done at the start of the game's next frame) */
             if (chosen.kind == recomp::Menu::Chosen::Save) AskSaveState(menu.Slot());
@@ -441,10 +543,98 @@ void Run(bool scripted)
                 menu.Close();
             }
         }
+    };
+    while (menu.IsOpen()) {
+        unsigned pressed = 0u;
+        SampleMenuKeys();
+        pad = recomp_input_host_pad_buttons();
+        if (scripted) {
+            if (script < shot.keys.size()) {
+                switch (shot.keys[script++]) {
+                case 'u': pressed = recomp::kMenuUp; break;
+                case 'd': pressed = recomp::kMenuDown; break;
+                case 'l': pressed = recomp::kMenuLeft; break;
+                case 'r': pressed = recomp::kMenuRight; break;
+                case 'c': pressed = recomp::kMenuConfirm; break;
+                case 'b': pressed = recomp::kMenuBack; break;
+                default: break;
+                }
+            }
+        } else {
+            pressed = repeat.Step(Held(pad));
+        }
+        /* (Esc, F1, Guide... close it from any page; not while typing a code, where Esc goes back to the menu) */
+        const unsigned close_held = scripted ? 0u : CloseHeld(pad);
+        const unsigned close_pressed = close_held & ~close_before;
+        close_before = close_held;
+        if (close_pressed != 0u && !typing_code) {
+            menu.Close();
+            break;
+        }
+        /* (typing a code to join: the keys are the code's; Return joins, Esc goes back to the menu) */
+        if (typing_code) {
+            pressed = 0u;
+            const int typed = TypedKey();
+            if (typed == '\n' && !typed_code.empty()) OnlineJoin(typed_code);
+            if (typed == 27) {
+                typing_code = false;
+                menu.Note("");
+            } else {
+                if (typed == '\b' && !typed_code.empty()) typed_code.pop_back();
+                else if (typed > ' ' && typed_code.size() < 40u) typed_code += static_cast<char>(typed);
+                menu.Note("Code: " + typed_code + "_   (Return joins, Esc goes back)");
+            }
+        }
+        /* (the lobby's matches, once they have come) */
+        std::vector<OpenMatch> now;
+        if (!typing_code && !lobby_shown && OnlineCanHost() && ++frames_open % 15u == 0u && OnlineLobby(now)) {
+            lobby_shown = true;
+            Configure();
+        }
+        act(menu.Buttons(pressed));
+        /* (the mouse: over a row chooses it, a click confirms, the right button goes back, the wheel goes up and down) */
+        std::vector<SDL_Event> events;
+        {
+            std::lock_guard<std::mutex> hold(mouse_lock);
+            events.swap(mouse_events);
+        }
+        for (const SDL_Event &event : events) {
+            if (!menu.IsOpen() || typing_code) break;
+            const SDL_WindowID id = event.type == SDL_EVENT_MOUSE_MOTION ? event.motion.windowID
+                : event.type == SDL_EVENT_MOUSE_WHEEL                     ? event.wheel.windowID
+                                                                          : event.button.windowID;
+            SDL_Window *window = SDL_GetWindowFromID(id);
+            recomp::Menu::Chosen chosen;
+            if (recomp::sdl::MouseEvent(event, window, PictureIn(window, width, height), menu, chosen)) act(chosen);
+        }
         picture = frame;
         if (menu.IsOpen()) menu.Draw(picture.data(), static_cast<int>(width), static_cast<int>(height));
         const RecompD3dPresenterError shown = recomp_d3d_presenter_show_image(presenter, picture.data(), width, height);
         if (shown == RECOMP_D3D_PRESENTER_CLOSED) recomp_stop(0, "host-window-closed");
+        /* (tests: SC2_TEST_MENU_CLICK=X,Y clicks the window there, as fractions of its width and height, once the menu is drawn:
+           the mouse's way through SDL's queue, the event watch and PictureIn) */
+        if (test_click != nullptr) {
+            const char *click = test_click;
+            test_click = nullptr;
+            int count = 0;
+            SDL_Window **windows = SDL_GetWindows(&count);
+            int w = 0, h = 0;
+            if (windows != nullptr && count > 0 && SDL_GetWindowSize(windows[0], &w, &h)) {
+                float fx = 0.5f, fy = 0.5f;
+                std::sscanf(click, "%f,%f", &fx, &fy);
+                mouse_wanted = true;
+                SDL_Event event{};
+                event.type = SDL_EVENT_MOUSE_BUTTON_DOWN;
+                event.button.windowID = SDL_GetWindowID(windows[0]);
+                event.button.button = SDL_BUTTON_LEFT;
+                event.button.down = true;
+                event.button.x = fx * w;
+                event.button.y = fy * h;
+                SDL_PushEvent(&event);
+                std::fprintf(stderr, "recomp sc2: test click at %.0f,%.0f of %dx%d\n", event.button.x, event.button.y, w, h);
+            }
+            SDL_free(windows);
+        }
         if (scripted && script >= shot.keys.size()) {
             SaveBmp(shot.path, picture, width, height);
             std::fprintf(stderr, "recomp sc2: menu picture %s\n", shot.path.c_str());
@@ -453,10 +643,16 @@ void Run(bool scripted)
         /* (a frame's time where the swapchain does not wait, a hidden window) */
         std::this_thread::sleep_for(std::chrono::milliseconds(16));
     }
+    mouse_wanted = false;
     sc2_touch_set_menu(false);
     speed = menu.Speed() < 0 ? kFullSpeed : menu.Speed();
-    /* The press that closed it does not reach the game. */
-    for (int frames = 0; !scripted && Held() != 0u && frames < 120; ++frames) {
+    /* The press that closed it does not reach the game (nor Start, of Start and Back). */
+    const auto any_held = [] {
+        const uint64_t now = recomp_input_host_pad_buttons();
+        return Held(now) != 0u || CloseHeld(now) != 0u || (now >> SDL_GAMEPAD_BUTTON_START & 1u) != 0u ||
+            (now >> SDL_GAMEPAD_BUTTON_BACK & 1u) != 0u;
+    };
+    for (int frames = 0; !scripted && any_held() && frames < 120; ++frames) {
         recomp_d3d_presenter_show_image(presenter, frame.data(), width, height);
         std::this_thread::sleep_for(std::chrono::milliseconds(16));
         SampleMenuKeys();
@@ -532,7 +728,7 @@ void PlayKeys()
     const bool slower = Pressed(SDL_SCANCODE_MINUS), faster = Pressed(SDL_SCANCODE_EQUALS);
     if (slower || faster) {
         speed = std::max(0, std::min(kSpeedCount - 1, speed + (faster ? 1 : -1)));
-        std::snprintf(note, sizeof note, "Speed: %s", kSpeeds[speed].c_str());
+        std::snprintf(note, sizeof note, "Speed: %s", recomp::layout::SpeedOf(speed).name);
         TrainingNote(note);
     }
 }
@@ -577,6 +773,7 @@ void SkipOpening()
 
 void OnPresent(uint32_t swap_counter)
 {
+    WatchEvents();
     DumpRam(swap_counter);
     SkipOpening();
     ApplyTraining(swap_counter);
@@ -616,7 +813,7 @@ void OnPresent(uint32_t swap_counter)
     }
     /* (slower: each frame shown for longer; faster: some frames not shown, GameSpeed) */
     if (speed < kFullSpeed && !OnlineInMatch()) {
-        const Speed &one = kSpeedTable[speed];
+        const recomp::layout::Speed one = recomp::layout::SpeedOf(speed);
         std::this_thread::sleep_for(std::chrono::microseconds(16667 * (one.ticks - one.frames) / one.frames));
     }
     if (export_present != 0u && swap_counter == export_present) {
@@ -662,7 +859,7 @@ bool TexturesDump() { return textures_dump; }
 
 double GameSpeed()
 {
-    const Speed &one = kSpeedTable[speed];
+    const recomp::layout::Speed one = recomp::layout::SpeedOf(speed);
     return OnlineInMatch() ? 1.0 : static_cast<double>(one.frames) / one.ticks;
 }
 

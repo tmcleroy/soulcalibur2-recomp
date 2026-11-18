@@ -30,6 +30,15 @@ enum : unsigned {
     kMenuBack = 32,    // leaves a page for the one it was reached from; on the first page, closes the menu
 };
 
+// What the mouse did (Menu::Mouse), at a place in the picture the menu was last drawn over
+enum class MenuMouse {
+    Move,      // over a row: that row is chosen
+    Click,     // the left button: on a row, chooses it and does what Confirm does there
+    Back,      // the right button (anywhere): what Back does
+    WheelUp,   // the wheel: the row above, as Up
+    WheelDown, // the row below, as Down
+};
+
 // A row of the first page.
 struct MenuRow {
     enum Kind {
@@ -43,11 +52,14 @@ struct MenuRow {
         Quit,   // "Quit game": Chosen::Quit
         Resume, // closes the menu
         Mute,   // "Mute": off or on, through MenuConfig::muted and setMuted (left out without them)
+        Reset,  // "Reset game": Chosen::Reset (the host starts the game again, as if switched off and on)
+        ResetOptions, // "Reset all options": the speed back to full, and Chosen::ResetOptions (the host puts every
+                      // option back as it first was)
     };
     Kind kind;
     int id;                  // Action: handed back when chosen
     std::string title;       // Action; Page: the page's name
-    std::string description; // Action
+    std::string description; // Action; Reset, ResetOptions: in place of the menu's own words (what they leave as it is, say)
     MenuRow(Kind kind, int id = 0, std::string title = {}, std::string description = {})
         : kind(kind), id(id), title(std::move(title)), description(std::move(description)) {}
 };
@@ -128,7 +140,7 @@ struct MenuRepeat {
 class Menu {
 public:
     struct Chosen {
-        enum Kind { None, Save, Load, Quit, Action, Command } kind = None;
+        enum Kind { None, Save, Load, Quit, Action, Command, Reset, ResetOptions } kind = None;
         int id = 0; // Action: the row's id. Command: its place in MenuConfig::commands.
     };
 
@@ -160,6 +172,9 @@ public:
         return m_speed;
     }
     void SetSpeed(int speed);
+    // The mouse: where it is, in the pixels of the picture last given to Draw (the host maps the window's place to
+    // that picture's), and what it did. Returns as Buttons does. A press away from the rows does nothing.
+    Chosen Mouse(MenuMouse what, float x, float y);
     // A line to tell the player (why not, say), until the next press
     void Note(const std::string &text) {
         m_note = text;
@@ -191,6 +206,13 @@ private:
     int m_speed = -1; // (-1: not chosen yet, so full speed)
     int m_slot = 1;
     std::string m_note;
+    // (where Draw last put each row shown, for Mouse: the row, and its top and bottom; and the panel's left and right)
+    struct Shown {
+        int row;
+        float top, bottom;
+    };
+    mutable std::vector<Shown> m_shown;
+    mutable float m_panelLeft = 0, m_panelRight = 0;
 };
 
 } // namespace recomp

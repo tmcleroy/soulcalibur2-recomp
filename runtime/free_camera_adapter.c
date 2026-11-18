@@ -4,6 +4,7 @@
 #include "d3d8_adapter.h"
 #include "free_camera.h"
 #include "input_host_win32.h"
+#include "input_keyboard_win32.h"
 #include "input_pulse_source.h"
 #include "overlay_text.h"
 #include "scene_freeze_adapter.h"
@@ -37,7 +38,7 @@
    The game builds one view a frame, taking four of them in turn; the free
    camera goes into whichever is built.
    P, or START while flying, freezes the game (the frame put back each frame
-   from a save state, sc2_frame.cpp) and . or the white button steps a frame;
+   from a save state, sc2_frame.cpp) and O (or .) or the white button steps a frame;
    H or the black button hides the 2D overlay (life bars, timer, names). The
    controls are DOA2U's: left stick or WASD move, right stick, the arrow keys
    or a right-mouse drag look, the triggers or Q / E go down / up, A or Shift
@@ -191,14 +192,14 @@ static void hint_panel(void)
     recomp_overlay_clear(&text);
     if (!state.active && recomp_scene_freeze_active() && !recomp_scene_freeze_overlay_hidden()) {
         recomp_overlay_set_title(&text, "Paused");
-        recomp_overlay_set_hint(&text, "P go on   . next frame   H hide the HUD   F5 save state   F9 load it");
+        recomp_overlay_set_hint(&text, "P go on   O next frame   H hide the HUD   F5 save state   F9 load it");
     }
     if (state.active && !recomp_scene_freeze_overlay_hidden()) {
         recomp_overlay_set_title(&text, recomp_scene_freeze_active() ? "Free camera (paused)" : "Free camera");
         recomp_overlay_set_hint(&text, state.controller_hints > 0
             ? "Sticks fly  LT/RT down/up  A fast  B slow  Start pause  White step  Black hide HUD\n"
               "Y reset  D-pad left fighter  D-pad right screenshot  R3 off"
-            : "WASD fly  Q/E down/up  arrows or right-drag look  Z/X zoom  P pause  . step  H hide HUD\n"
+            : "WASD fly  Q/E down/up  arrows or right-drag look  Z/X zoom  P pause  O step  H hide HUD\n"
               "Shift fast  Ctrl slow  R reset  \\ fighter  F12 screenshot  ` off");
     }
     recomp_overlay_publish(&text);
@@ -288,7 +289,9 @@ static void capture(uint32_t port, RecompInputGamepad *g, uint16_t stick_clicks)
     state.overlay_held = overlay;
 
     /* A step press moves one frame; held, it steps every frame after a while. */
-    const bool step = (state.active || paused) && (KEY(PERIOD) || (state.active && pressed(g, RECOMP_INPUT_ANALOG_WHITE)));
+    /* (O as in the other ports, . as this one always had it) */
+    const bool step = (state.active || paused) && (KEY(PERIOD) || recomp_input_scancode_held(SDL_SCANCODE_O) ||
+        (state.active && pressed(g, RECOMP_INPUT_ANALOG_WHITE)));
     const uint64_t now = SDL_GetTicks();
     if (step && !state.step_held) { recomp_scene_freeze_step(); state.step_since = now; }
     else if (step && now - state.step_since >= STEP_REPEAT_AFTER_MS) recomp_scene_freeze_step();
