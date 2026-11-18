@@ -47,6 +47,7 @@ bool g_grid_balanced = false; /* the grid laid out in rows of five (BalanceGrid)
 int g_hires_pictures = 20;    /* the Art Gallery's Hi-Res pictures (sc2_guest_hires_pictures) */
 bool g_guest_loaded[2];       /* Link, Heihachi in the guests' file (sc2_guest_loaded) */
 bool g_profile_item[2];       /* ... with their profile items, 48 and 49 (sc2_guest_profile_item) */
+bool g_boss_form[2];          /* ... with the final boss's form for each (sc2_guest_boss_form) */
 
 void Write(uint32_t address, const char *bytes, size_t length)
 {
@@ -157,6 +158,8 @@ const WeaponPart kHeihachiWeaponParts[2] = {
 
 /* Link and Heihachi: their blocks (roster.py) and the fifth column's top two cells. */
 const RosterGuest kRoster[2] = {{27, 24, 4, 4}, {28, 25, 9, 2}};
+/* ... and the final boss's form for each on its own disc (the Xbox's guest slot has 10) */
+constexpr uint32_t kBossForm[2] = {9u, 11u}, kSlotBossForm = 10u;
 
 /* An olnk container's entry (offset in the file, size), or size 0 for a hole. */
 bool Entry(std::FILE *f, uint64_t container, uint32_t index, uint64_t &at, uint32_t &size)
@@ -291,6 +294,15 @@ bool ApplyGuestRoster(const char *path)
             picture[g] = Entry(f, ui, Ui(345u + uint32_t(g)), at, length) && length != 0u;
         }
     }
+    /* (the final boss's form for each guest, /4 entries 7 and 23 + the form: Link's 9, Heihachi's 11, as on their
+       own discs; tools/guests/forms.py. A guests' file built before these has none.) */
+    bool form[2] = {false, false};
+    for (int g = 0; ok && g < 2; ++g) {
+        uint64_t at;
+        uint32_t first = 0, second = 0;
+        form[g] = Entry(f, characters, 7u + kBossForm[g], at, first) && Entry(f, characters, 23u + kBossForm[g], at, second) &&
+                  first != 0u && second != 0u;
+    }
     for (int g = 0; ok && g < 2; ++g) {
         uint64_t at;
         if (!Entry(f, characters, uint32_t(46 + 39 * kRoster[g].block + 38), at, size)) { ok = false; break; }
@@ -378,6 +390,8 @@ bool ApplyGuestRoster(const char *path)
     }
     g_guest_loaded[0] = !profiles[0].empty();
     g_guest_loaded[1] = !profiles[1].empty();
+    g_boss_form[0] = g_guest_loaded[0] && form[0];
+    g_boss_form[1] = g_guest_loaded[1] && form[1];
     return true;
 }
 
@@ -391,6 +405,12 @@ extern "C" int sc2_guest_hires_pictures(void)
 extern "C" int sc2_guest_loaded(uint32_t character)
 {
     return (character == 27u || character == 28u) && sc2::g_guest_loaded[character - 27u];
+}
+
+extern "C" uint32_t sc2_guest_boss_form(uint32_t character)
+{
+    if ((character == 27u || character == 28u) && sc2::g_boss_form[character - 27u]) return sc2::kBossForm[character - 27u];
+    return sc2::kSlotBossForm;
 }
 
 extern "C" int sc2_guest_profile_item(uint32_t character)

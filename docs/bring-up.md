@@ -228,7 +228,8 @@ its progress is saved only by Save Data. The yes/no prompts of the save screens 
 Two more test aids: `SC2_TEST_KO=1` empties player 2's health in fights (an
 Arcade run to the ending takes about eight minutes headless), and
 `SC2_TEST_ITEMS=FIRST-LAST` owns those items (the item states at 0x3BB368: 3 is
-had) at the title. Arcade's and VS Battle's character select is current scene
+had) at the title. (Items 278-299 are the characters' own, their endings in the Museum's Demo Theater,
+Character Ending: 278 + the roster place.) Arcade's and VS Battle's character select is current scene
 10, a fight 7.
 
 `--export-pictures SWAP[:FOLDER]` runs the menu's Export pictures at that Swap (to FOLDER, or `pictures/` beside

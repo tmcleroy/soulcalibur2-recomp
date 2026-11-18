@@ -13,6 +13,9 @@ Bytes convert_motion_bank(const Bytes &gc);
 std::vector<Bytes> convert_moveset(std::vector<Bytes> parts);
 Bytes convert_pose_bank(const Bytes &gc);
 Bytes convert_records(const Bytes &gc);
+/* The final boss's forms (tools/guests/forms.py): a form's part 1 (its motions' names) and part 2 (its camera track). */
+Bytes convert_form_names(const Bytes &gc);
+Bytes convert_form_camera(const Bytes &gc);
 
 } // namespace guest
 

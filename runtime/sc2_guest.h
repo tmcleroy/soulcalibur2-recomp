@@ -48,6 +48,9 @@ void sc2_guest_weapon_bones(uint32_t player, uint32_t fighter);
 int sc2_guest_loaded(uint32_t character);
 /* A guest's profile item (48 Link, 49 Heihachi), or -1 (no guest, or a guests' file without its unlock's picture) */
 int sc2_guest_profile_item(uint32_t character);
+/* The final boss's form against a guest: its own disc's (Link 9, Heihachi 11) when the guests' file has it, or the
+   guest slot's (10) */
+uint32_t sc2_guest_boss_form(uint32_t character);
 /* Nonzero when a guest stands in the select grid's fifth column. */
 int sc2_guest_fifth_column(void);
 /* Nonzero when the select grid is laid out in rows of five, Random alone in the sixth (sc2_guest.cpp, BalanceGrid). */

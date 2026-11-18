@@ -44,6 +44,9 @@ extern void sub_00145A40(void);
 extern void sub_000344D0(void);
 extern void sub_0002A350(void);
 extern void sub_000DE480(void);
+extern void sub_00056A00(void);
+extern void sub_00055010(void);
+extern void sub_00046550(void);
 /* rand (0x145A40). Online, the calls from 0x140730 and 0x141840 (sound and effects, run as often as the host's
    audio and timing have them, so not as often on both machines) draw from a state of their own, so that the
    game's numbers stay alike on both. */
@@ -291,17 +294,47 @@ static void random_seed(void)
 /* 0x528E0(id, opponent): which of the final boss's forms (Inferno takes a fighting style from the one it fights:
    its /4 entry 7 + the form, or 23 + it) goes with the opponent's character, by a table of IDs 1-29 (0x52978).
    The guests beside Spawn (27, 28) and bonus fighters (30..32) are not in it and get form 0, whose entries are empty
-   on the disc: loading one is the game's own endless loop (0x20ED0), before the final stage of Arcade. They take
-   the guest slot's (Spawn's, form 10), as Spawn in their place would. */
+   on the disc: loading one is the game's own endless loop (0x20ED0), before the final stage of Arcade. Each
+   version's program has a form for its own guest alone: 10 for Spawn here, 9 for Link on the GameCube, 11 for
+   Heihachi on the PS2. The guests' file brings those two from their discs (tools/guests/forms.py) and Link and
+   Heihachi take them (issue #90); with a file built before that, and for the bonus fighters, the guest slot's
+   (Spawn's, form 10), as Spawn in their place would. */
 static void boss_form(void)
 {
     const int32_t opponent = (int32_t)*recomp_memory_u32(recomp_runtime.registers.esp + 8u);
     if (opponent == 27 || opponent == 28 || (opponent >= 30 && opponent <= 32)) {
-        recomp_runtime.registers.eax = 10u;
+        recomp_runtime.registers.eax = sc2_guest_boss_form((uint32_t)opponent);
         recomp_runtime.registers.esp += 4u;
         return;
     }
     sub_000528E0();
+}
+
+/* 0x55010(...): sets up a fight's second fighter, among them the final boss's fighting style. Against Inferno
+   (character 19) the style is its opponent's, except for the characters that came from elsewhere, whose moves
+   Inferno does not take: those it fights with Nightmare's (17). The test (0x55180) names Spawn and Necrid, with
+   Inferno and Charade (0x46600) and the bonus fighters (0x46550, IDs 30 and over). Each version names its own guest
+   there: the GameCube's program Link (27, 0x800B4A60), the PS2's Heihachi (28, 0x15F908), so on their consoles
+   Inferno meets them with Nightmare's moves the first time (issue #90). Here, while 0x55010 runs, 0x46550 answers
+   yes for both: it is called once in it, for that test. */
+static int inferno_style_test;
+static void second_fighter(void)
+{
+    ++inferno_style_test;
+    sub_00055010();
+    --inferno_style_test;
+}
+
+/* 0x46550(character): a bonus fighter (30 and over) */
+static void bonus_fighter(void)
+{
+    const uint32_t character = *recomp_memory_u32(recomp_runtime.registers.esp + 4u);
+    if (inferno_style_test && (character == 27u || character == 28u)) {
+        recomp_runtime.registers.eax = 1u;
+        recomp_runtime.registers.esp += 4u;   /* the original's ret */
+        return;
+    }
+    sub_00046550();
 }
 
 /* 0xDE480(ending), the Arcade ending's first step: loads its picture and text by the character's row in the table
@@ -383,11 +416,36 @@ static void play_counted(void)
 }
 
 /* 0x569F0 (character in eax): the character's own item (its roster place + 0x116), which the game checks
-   (0x56690) and sets (0x57680). With no place the guests had item 277, another's; they take Spawn's. */
+   (0x56690) and sets (0x57680): clearing Arcade gets it, and with it had the Museum's Character Ending shows the
+   character's ending. With no place the guests had item 277, another's; they take Spawn's. The bonus fighters
+   (30-32) have the roster's last three places, so items 299-301, though no endings of their own: 299 is one of the
+   save's spare states, which hold Heihachi's last weapons (sc2_guest_items.c), and 300 and 301 are past the states
+   altogether. Clearing Arcade with Lizardman so gave Heihachi a weapon, and with those weapons had the Museum
+   offered Lizardman's ending, which does not exist (issue #91). They have no item (-1, the game's "none": nothing
+   sets it), and for the Museum it is not had (character_ending, below). */
 static void character_item(void)
 {
+    if (recomp_runtime.registers.eax >= 30u && recomp_runtime.registers.eax <= 32u) {
+        recomp_runtime.registers.eax = 0xffffffffu;
+        recomp_runtime.registers.esp += 4u;   /* the original's ret */
+        return;
+    }
     if (recomp_runtime.registers.eax == 27u || recomp_runtime.registers.eax == 28u) recomp_runtime.registers.eax = 29u;
     sub_000569F0();
+}
+
+/* 0x56A00(character): the state of the character's own item (0 not had, 3 had), by which the Museum lists its
+   Character Ending entry (0x775E0) and opens each cell of that entry's character select (0x6A28A). The bonus
+   fighters have none (character_item): not had, where the game's "none" counts as had. */
+static void character_ending(void)
+{
+    const uint32_t character = *recomp_memory_u32(recomp_runtime.registers.esp + 4u);
+    if (character >= 30u && character <= 32u) {
+        recomp_runtime.registers.eax = 0u;
+        recomp_runtime.registers.esp += 4u;   /* the original's ret */
+        return;
+    }
+    sub_00056A00();
 }
 
 /* The guests' places beside the 24-character roster (0x19CA20): Link 24, Heihachi 25. 0x36A70(character) gives a
@@ -627,6 +685,9 @@ RecompFunction recomp_sc2_hooks_lookup_manual(uint32_t address)
     case 0x000d24f0u: return result_name;
     case 0x000d29a0u: return beaten_list;
     case 0x000569f0u: return character_item;
+    case 0x00056a00u: return character_ending;
+    case 0x00055010u: return second_fighter;
+    case 0x00046550u: return bonus_fighter;
     case 0x000dcfa0u: return gallery_grid;
     case 0x000528e0u: return boss_form;
     case 0x0001c2b0u: return random_seed;
