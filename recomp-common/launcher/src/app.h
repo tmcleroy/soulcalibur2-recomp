@@ -122,10 +122,13 @@ private:
         int value;
         std::string note;  // ("": none)
         size_t index;      // in the list it came from
+        std::vector<bool> hidden = {};  // (its choices left out of the dropdown: the port's choice_shown; empty: none)
     };
 
     // A game's feature on the pages: the port's feature_shown, given the game's file if it was found good
     bool feature_shown(const Slot& one, size_t feature);
+    // ... and which of its choices the port's choice_shown leaves out (empty: none)
+    std::vector<bool> hidden_choices(const Slot& one, size_t feature);
     Slot& slot() { return *slots_[slot_]; }
     const Slot& slot() const { return *slots_[slot_]; }
     // The collection's games that have a page of their own (their program here, their file chosen and usable), in
@@ -303,6 +306,9 @@ private:
     static const char* own_version();
     static bool version_matches(const std::string& version);
     void files_card(float width);
+    void game_files_card(const Slot& one, float width);
+    void folder_card(const char* title, const std::filesystem::path& where, bool portable, bool game, float width);
+    void tools_card(float width);
     void language_card(float width);
 
     // The Multi game page (a collection's MultiModes): a mode's choices and games, and the run of one

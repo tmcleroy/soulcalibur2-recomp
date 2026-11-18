@@ -16,7 +16,7 @@ using namespace text;
 
 namespace {
     // (after MenuRow's kinds, which the first page's rows keep)
-    enum { kRowSave, kRowLoad, kRowSlot, kRowSpeed, kRowAction, kRowQuit, kRowResume, kRowCommand, kRowPage, kRowFeature, kRowBack, kRowMute, kRowFavourites };
+    enum { kRowSave, kRowLoad, kRowSlot, kRowSpeed, kRowAction, kRowQuit, kRowResume, kRowCommand, kRowPage, kRowFeature, kRowBack, kRowMute, kRowFavourites, kRowReset, kRowResetOptions };
     constexpr unsigned kArrows = kMenuUp | kMenuDown | kMenuLeft | kMenuRight;
 } // namespace
 
@@ -145,6 +145,8 @@ void Menu::Fill() {
                 case MenuRow::Action: add({kRowAction, index, ""}); break;
                 case MenuRow::Quit: add({kRowQuit, index, ""}); break;
                 case MenuRow::Resume: add({kRowResume, index, ""}); break;
+                case MenuRow::Reset: add({kRowReset, index, ""}); break;
+                case MenuRow::ResetOptions: add({kRowResetOptions, index, ""}); break;
                 case MenuRow::Mute:
                     if (m_config.muted && m_config.setMuted) {
                         add({kRowMute, index, ""});
@@ -333,6 +335,8 @@ Menu::Chosen Menu::Buttons(unsigned pressed) {
     case kRowLoad: return {Chosen::Load, 0};
     case kRowAction: return {Chosen::Action, m_first[row.index].id};
     case kRowQuit: return {Chosen::Quit, 0};
+    case kRowReset: return {Chosen::Reset, 0};
+    case kRowResetOptions: SetSpeed(m_config.normalSpeed); return {Chosen::ResetOptions, 0};
     case kRowResume: m_open = false; break;
     case kRowCommand: return {Chosen::Command, static_cast<int>(row.index)};
     case kRowPage: Enter(row.page); break;
@@ -342,8 +346,33 @@ Menu::Chosen Menu::Buttons(unsigned pressed) {
     return {};
 }
 
+Menu::Chosen Menu::Mouse(MenuMouse what, float x, float y) {
+    if (!m_open || m_rows.empty()) {
+        return {};
+    }
+    switch (what) {
+    case MenuMouse::Back: return Buttons(kMenuBack);
+    case MenuMouse::WheelUp: return Buttons(kMenuUp);
+    case MenuMouse::WheelDown: return Buttons(kMenuDown);
+    default: break;
+    }
+    // (the row under the mouse, as last drawn; none: away from the rows)
+    int over = -1;
+    for (const Shown &shown : m_shown) {
+        if (x >= m_panelLeft && x < m_panelRight && y >= shown.top && y < shown.bottom && shown.row < static_cast<int>(m_rows.size())) {
+            over = shown.row;
+        }
+    }
+    if (over < 0) {
+        return {};
+    }
+    m_selected = over;
+    return what == MenuMouse::Click ? Buttons(kMenuConfirm) : Chosen{};
+}
+
 void Menu::Draw(uint32_t *pixels, int width, int height) const {
     static constexpr Color white{255, 255, 255, 255}, dim{160, 164, 176, 255}, on{110, 220, 120, 255};
+    m_shown.clear();
     if (m_rows.empty()) {
         return;
     }
@@ -384,6 +413,16 @@ void Menu::Draw(uint32_t *pixels, int width, int height) const {
         case kRowAction:
             title = Tr(m_first[row.index].title);
             rowDescription = Tr(m_first[row.index].description);
+            break;
+        case kRowReset:
+            title = Tr("Reset game");
+            rowDescription = Tr(m_first[row.index].description.empty() ? "Starts the game again, as if switched off and on."
+                                                                        : m_first[row.index].description.c_str());
+            break;
+        case kRowResetOptions:
+            title = Tr("Reset all options");
+            rowDescription = Tr(m_first[row.index].description.empty() ? "Puts every option back as it first was, and the speed to full."
+                                                                        : m_first[row.index].description.c_str());
             break;
         case kRowQuit:
             title = Tr("Quit game");
@@ -517,6 +556,8 @@ void Menu::Draw(uint32_t *pixels, int width, int height) const {
 
     const float x = px + pad;
     float y = py + pad;
+    m_panelLeft = px;
+    m_panelRight = px + panelWidth;
     canvas.Text(x, y, 2 * d, 0, white, Tr(m_page.empty() ? "Menu" : m_page.c_str()));
     if (shown < m_rows.size()) {
         const std::string place = i18n::TrFormat("{} of {}", {std::to_string(m_selected + 1), std::to_string(m_rows.size())});
@@ -533,6 +574,7 @@ void Menu::Draw(uint32_t *pixels, int width, int height) const {
         if (selected) {
             canvas.Fill(px + pad / 2, y, panelWidth - pad, rowHeight, {255, 255, 255, 40});
         }
+        m_shown.push_back({static_cast<int>(i), y, y + rowHeight});
         std::string title, value, rowDescription;
         Color valueColor = white;
         Describe(m_rows[i], title, value, valueColor, rowDescription);
