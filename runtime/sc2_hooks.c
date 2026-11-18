@@ -45,6 +45,8 @@ extern void sub_000344D0(void);
 extern void sub_0002A350(void);
 extern void sub_000DE480(void);
 extern void sub_00056A00(void);
+extern void sub_00055010(void);
+extern void sub_00046550(void);
 /* rand (0x145A40). Online, the calls from 0x140730 and 0x141840 (sound and effects, run as often as the host's
    audio and timing have them, so not as often on both machines) draw from a state of their own, so that the
    game's numbers stay alike on both. */
@@ -306,6 +308,33 @@ static void boss_form(void)
         return;
     }
     sub_000528E0();
+}
+
+/* 0x55010(...): sets up a fight's second fighter, among them the final boss's fighting style. Against Inferno
+   (character 19) the style is its opponent's, except for the characters that came from elsewhere, whose moves
+   Inferno does not take: those it fights with Nightmare's (17). The test (0x55180) names Spawn and Necrid, with
+   Inferno and Charade (0x46600) and the bonus fighters (0x46550, IDs 30 and over). Each version names its own guest
+   there: the GameCube's program Link (27, 0x800B4A60), the PS2's Heihachi (28, 0x15F908), so on their consoles
+   Inferno meets them with Nightmare's moves the first time (issue #90). Here, while 0x55010 runs, 0x46550 answers
+   yes for both: it is called once in it, for that test. */
+static int inferno_style_test;
+static void second_fighter(void)
+{
+    ++inferno_style_test;
+    sub_00055010();
+    --inferno_style_test;
+}
+
+/* 0x46550(character): a bonus fighter (30 and over) */
+static void bonus_fighter(void)
+{
+    const uint32_t character = *recomp_memory_u32(recomp_runtime.registers.esp + 4u);
+    if (inferno_style_test && (character == 27u || character == 28u)) {
+        recomp_runtime.registers.eax = 1u;
+        recomp_runtime.registers.esp += 4u;   /* the original's ret */
+        return;
+    }
+    sub_00046550();
 }
 
 /* 0xDE480(ending), the Arcade ending's first step: loads its picture and text by the character's row in the table
@@ -657,6 +686,8 @@ RecompFunction recomp_sc2_hooks_lookup_manual(uint32_t address)
     case 0x000d29a0u: return beaten_list;
     case 0x000569f0u: return character_item;
     case 0x00056a00u: return character_ending;
+    case 0x00055010u: return second_fighter;
+    case 0x00046550u: return bonus_fighter;
     case 0x000dcfa0u: return gallery_grid;
     case 0x000528e0u: return boss_form;
     case 0x0001c2b0u: return random_seed;

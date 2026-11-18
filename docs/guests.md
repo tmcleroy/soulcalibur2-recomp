@@ -398,6 +398,12 @@ form, and the style's bank is re-encoded like every other. `boss_form` (runtime/
 Link and 11 for Heihachi when the file has the entries (`sc2_guest_boss_form`), and 10 as before with a file built
 earlier. Both guests' Arcade runs load their own form and play to their endings.
 
+Inferno's moves are another matter: the fight's second fighter (0x55010) takes its opponent's moves, except
+against the characters from elsewhere (0x55180: Spawn, Necrid, Inferno, Charade and the bonus fighters), whom it
+fights with Nightmare's (17). The GameCube's program names Link there (0x800B4A60) and the PS2's Heihachi
+(0x15F908). `second_fighter` and `bonus_fighter` (runtime/sc2_hooks.c) add both: Heihachi's Arcade run then loads
+Nightmare's moveset for the final fight.
+
 ## Their profile unlocks (2026-11-01)
 
 Clearing Arcade unlocks the character's profile: an item (kind 3) from the table at 0x1A2300 (Talim 22 -> 11),
