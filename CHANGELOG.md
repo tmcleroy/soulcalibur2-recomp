@@ -8,6 +8,10 @@ Fixes from players' reports.
   Lizardman, Assassin and Berserker have no endings of their own, but with Heihachi's last weapons had (or everything
   unlocked from the menu) the Museum offered Lizardman's, and choosing it showed nothing. Their places there stay
   locked. Clearing Arcade with Lizardman also no longer gives Heihachi a weapon.
+- **Inferno against Link and Heihachi** ([#90](https://github.com/tmcleroy/soulcalibur2-recomp/issues/90)): the
+  final boss fought both guests in the style it has for Spawn. It now takes the form each guest's own disc has for
+  them (the GameCube's for Link, the PlayStation 2's for Heihachi). **Build the guests again** on the launcher's
+  Guest page to get it; until then it fights as before. Online, both players need the rebuilt file.
 
 ## 0.5.0-beta.1
 

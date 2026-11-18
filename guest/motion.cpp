@@ -134,4 +134,35 @@ Bytes convert_records(const Bytes &gc)
     return out;
 }
 
+/* (tools/guests/forms.py, convert_names) */
+Bytes convert_form_names(const Bytes &gc)
+{
+    Bytes out = gc;
+    if (gc.size() < 0x20) return out;
+    const size_t table = be32(gc, 4);
+    swap32(out, 0, 4);
+    const size_t first_name = be32(gc, 0x1c);
+    for (size_t record = 0x10; record + 16 <= std::min(first_name, gc.size()); record += 16) {
+        swap16(out, record, 2);
+        swap32(out, record + 4, 3);
+    }
+    if (table + 4 <= gc.size()) {
+        const size_t names = be32(gc, table);
+        swap32(out, table, std::min(names, gc.size() - table) / 4);
+    }
+    return out;
+}
+
+/* (tools/guests/forms.py, convert_camera) */
+Bytes convert_form_camera(const Bytes &gc)
+{
+    Bytes out = gc;
+    swap32(out, 0, gc.size() / 4);
+    if (gc.size() >= 0x50) {
+        std::copy(gc.begin() + 0x48, gc.begin() + 0x50, out.begin() + 0x48);
+        swap16(out, 0x48, 4);
+    }
+    return out;
+}
+
 } // namespace guest

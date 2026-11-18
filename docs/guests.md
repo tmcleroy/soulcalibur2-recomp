@@ -375,6 +375,29 @@ The game sizes its reads of root.olk from the directory listing of D:\. The
 runtime now lists an overridden file at its own size; before that, a guests file
 longer than the disc's root.olk read short and the game hung.
 
+## The final boss's form for each guest (2026-11-18, issue #90)
+
+Inferno takes a fighting style from the character it fights: 0x528E0 gives a form by that character (a table of IDs
+1-29) and the game loads /4 entry 7 + the form for the first fight, 23 + it for the second. Each version's program
+has a form for its own guest and 0 for the other two, and each disc the entries to match:
+
+| | Spawn | Link | Heihachi |
+| --- | --- | --- | --- |
+| form | 10 (Xbox) | 9 (GameCube, 0x800B5558) | 11 (PS2, 0x160264) |
+| /4 entries | 17, 33 | 16, 32 | 18, 34 |
+
+(The PS2 disc holds all three pairs; the GameCube's has Link's alone, the Xbox's Spawn's alone.) The port gave both
+guests Spawn's form, so Inferno fought them with the wrong style and the scene around the fight was Spawn's.
+
+A form is a pack of nine parts: a motion bank of two motions, 640 bytes naming them, a pack of one camera track,
+four empty parts, the sound bank every form of that fight has, and the style's sound bank. `tools/guests/forms.py`
+(and `guest/build.cpp`, the same bytes) puts Link's and Heihachi's in the guests' file at their own discs' places:
+the PS2's first three parts are the Xbox's bytes already, the GameCube's are turned around (checked against the 24
+forms both discs have, and against the PS2's copy of Link's), the shared sound bank is the Xbox's own from Spawn's
+form, and the style's bank is re-encoded like every other. `boss_form` (runtime/sc2_hooks.c) then answers 9 for
+Link and 11 for Heihachi when the file has the entries (`sc2_guest_boss_form`), and 10 as before with a file built
+earlier. Both guests' Arcade runs load their own form and play to their endings.
+
 ## Their profile unlocks (2026-11-01)
 
 Clearing Arcade unlocks the character's profile: an item (kind 3) from the table at 0x1A2300 (Talim 22 -> 11),

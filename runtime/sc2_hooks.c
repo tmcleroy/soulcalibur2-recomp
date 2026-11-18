@@ -292,13 +292,16 @@ static void random_seed(void)
 /* 0x528E0(id, opponent): which of the final boss's forms (Inferno takes a fighting style from the one it fights:
    its /4 entry 7 + the form, or 23 + it) goes with the opponent's character, by a table of IDs 1-29 (0x52978).
    The guests beside Spawn (27, 28) and bonus fighters (30..32) are not in it and get form 0, whose entries are empty
-   on the disc: loading one is the game's own endless loop (0x20ED0), before the final stage of Arcade. They take
-   the guest slot's (Spawn's, form 10), as Spawn in their place would. */
+   on the disc: loading one is the game's own endless loop (0x20ED0), before the final stage of Arcade. Each
+   version's program has a form for its own guest alone: 10 for Spawn here, 9 for Link on the GameCube, 11 for
+   Heihachi on the PS2. The guests' file brings those two from their discs (tools/guests/forms.py) and Link and
+   Heihachi take them (issue #90); with a file built before that, and for the bonus fighters, the guest slot's
+   (Spawn's, form 10), as Spawn in their place would. */
 static void boss_form(void)
 {
     const int32_t opponent = (int32_t)*recomp_memory_u32(recomp_runtime.registers.esp + 8u);
     if (opponent == 27 || opponent == 28 || (opponent >= 30 && opponent <= 32)) {
-        recomp_runtime.registers.eax = 10u;
+        recomp_runtime.registers.eax = sc2_guest_boss_form((uint32_t)opponent);
         recomp_runtime.registers.esp += 4u;
         return;
     }

@@ -161,6 +161,30 @@ void link_block(const Olnk &x4, const Olnk &g4, std::vector<Bytes> &entries, con
     link_rest(g4, entries, step);
 }
 
+/* The final boss's form for a guest (tools/guests/forms.py): a pack of nine parts, from the guest's own disc
+   (the GameCube's /4/16 and /4/32 for Link, the PS2's /4/18 and /4/34 for Heihachi), with the Xbox's own copy of
+   the sound bank every form has (part 7, from its guest's form) and the style's sound bank re-encoded (part 8). */
+constexpr uint32_t FORM_FIRST = 7, FORM_SECOND = 23, LINK_FORM = 9, SPAWN_FORM = 10, HEIHACHI_FORM = 11;
+
+Bytes link_form(const Bytes &xbox_form, const Bytes &gc_form)
+{
+    auto parts = parts_of(gc_form, true);
+    parts.at(0) = convert_motion_bank(parts.at(0));
+    parts.at(1) = convert_form_names(parts.at(1));
+    parts.at(2) = convert_form_camera(parts.at(2));
+    parts.at(7) = parts_of(xbox_form, false).at(7);
+    parts.at(8) = convert_sound_container(parts.at(8));
+    return build_pack(parts, pack_alignment(xbox_form));
+}
+
+Bytes heihachi_form(const Bytes &xbox_form, const Bytes &ps2_form)
+{
+    auto parts = parts_of(ps2_form, false);
+    parts.at(7) = parts_of(xbox_form, false).at(7);
+    parts.at(8) = convert_sound_container(parts.at(8));
+    return build_pack(parts, pack_alignment(xbox_form));
+}
+
 Bytes names_as(Bytes table, const std::string &name)
 {
     const uint32_t count = le32(table, 4);
@@ -580,6 +604,8 @@ void build_guests_root(const DiscFile &xbox, const DiscFile *gamecube, const Dis
         std::vector<Bytes> block(work.begin() + GUEST_BLOCK, work.begin() + GUEST_BLOCK + 39);
         block.at(38) = roster_profile(dol_program(gamecube->program()), 0x80275A60u, 0x8028E9D8u, 0x80250520u, 1, ROSTER_LINK);
         std::copy(block.begin(), block.end(), e4.begin() + ROSTER_LINK_BLOCK);
+        for (uint32_t fight : {FORM_FIRST, FORM_SECOND})
+            e4.at(fight + LINK_FORM) = link_form(x4.bytes(fight + SPAWN_FORM), g4.bytes(fight + LINK_FORM));
         std::vector<Bytes> ui = e2;
         guest_ui_entries(x2, g2, ui, layout);
         for (const auto &pair : LINK_OWN_UI) e2.at(layout.ui(pair[1])) = ui.at(layout.ui(pair[0]));
@@ -601,6 +627,8 @@ void build_guests_root(const DiscFile &xbox, const DiscFile *gamecube, const Dis
         std::vector<Bytes> block(work.begin() + GUEST_BLOCK, work.begin() + GUEST_BLOCK + 39);
         block.at(38) = roster_profile(elf_program(ps2->program()), 0x003FABB8u, 0, 0x0048F958u, 1, ROSTER_HEIHACHI);
         std::copy(block.begin(), block.end(), e4.begin() + ROSTER_HEIHACHI_BLOCK);
+        for (uint32_t fight : {FORM_FIRST, FORM_SECOND})
+            e4.at(fight + HEIHACHI_FORM) = heihachi_form(x4.bytes(fight + SPAWN_FORM), p4.bytes(fight + HEIHACHI_FORM));
         std::vector<Bytes> ui = e2;
         heihachi_ui_entries(x2, p2, ui, layout);
         for (const auto &pair : HEIHACHI_OWN_UI) e2.at(layout.ui(pair[1])) = ui.at(layout.ui(pair[0]));

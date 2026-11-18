@@ -9,6 +9,8 @@ the GameCube, SLUS_206.43 on the PS2). What goes where:
   /4: two blocks appended after Spawn's, 24 (Link) and 25 (Heihachi), built from Spawn's like the guest's
       (build_guest.py); a guest without a disc leaves its block empty. Slot 38 of each holds the guest's
       profile (below), which the runtime puts in the program's tables (runtime/sc2_guest.cpp).
+      The final boss's form for each guest (forms.py) goes in the places its own disc has it: Link's at 16 and
+      32, Heihachi's at 18 and 34.
   /2: each guest's select-screen entries in its own places (the versions keep one entry per character, empty
       for the others: Link's at 84, 146, 178, 284, 422, 470-472; Heihachi's at 85, 147, 179, 285, 423,
       473-474); its grid icons appended to /2/5 part 2 and its large icons to /2/9 and /2/10 part 0.
@@ -26,6 +28,7 @@ import struct
 import sys
 
 import build_guest
+import forms
 import ps2tex
 import textures
 from olnk import Olnk, build, build_pack, pack_alignment, pack_parts
@@ -195,6 +198,9 @@ def build_roster(xbox_path, gc_path, ps2_path, output):
         program = Dol(_program(gc_path, GAMECUBE[0]))
         block[38] = profile(program, *GAMECUBE[1:], LINK)
         e4[block_start(LINK):block_start(LINK) + 39] = block
+        for fight in (forms.FIRST, forms.SECOND):
+            e4[fight + forms.LINK_FORM] = forms.link_form(x4.bytes(fight + forms.SPAWN_FORM),
+                                                           g4.bytes(fight + forms.LINK_FORM))
         ui = build_guest.guest_ui(x2, g2, layout.ui)
         for spawn, own in LINK_UI:
             e2[layout.ui(own)] = ui[spawn]
@@ -214,6 +220,9 @@ def build_roster(xbox_path, gc_path, ps2_path, output):
         program = Elf(_program(ps2_path, PS2[0]))
         block[38] = profile(program, *PS2[1:], HEIHACHI)
         e4[block_start(HEIHACHI):block_start(HEIHACHI) + 39] = block
+        for fight in (forms.FIRST, forms.SECOND):
+            e4[fight + forms.HEIHACHI_FORM] = forms.heihachi_form(x4.bytes(fight + forms.SPAWN_FORM),
+                                                                   p4.bytes(fight + forms.HEIHACHI_FORM))
         work = list(e2)   # (scratch: Heihachi's entries at the US disc's indexes)
         build_guest.heihachi_ui_entries(x2, p2, work, layout.ui)
         for spawn, own in HEIHACHI_UI:
