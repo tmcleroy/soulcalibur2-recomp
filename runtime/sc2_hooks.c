@@ -47,6 +47,25 @@ extern void sub_000DE480(void);
 extern void sub_00056A00(void);
 extern void sub_00055010(void);
 extern void sub_00046550(void);
+extern void sub_00146610(void);
+/* memmove (0x146610; memcpy calls it too): the C library's, copied natively. Its last bytes go through small jump
+   tables, and on the European disc (0x14B810) the lift lost the arm for none left (the table at 0x14BAA8 reads from
+   -7 to 0 and slot 0 was not found), so a copy ending on a whole dword stopped the game ("unresolved indirect call
+   to 0x0014baef", in Arcade and Survival as fighters attacked). */
+static void memory_move(void)
+{
+    const uint32_t esp = recomp_runtime.registers.esp;
+    const uint32_t to = *recomp_memory_u32(esp + 4u), from = *recomp_memory_u32(esp + 8u),
+                   count = *recomp_memory_u32(esp + 12u);
+    uint8_t *const out = recomp_memory_ram(to, count), *const in = recomp_memory_ram(from, count);
+    if (count != 0u && (out == NULL || in == NULL)) {
+        sub_00146610();   /* (memory the runtime watches: the game's own copy) */
+        return;
+    }
+    if (count != 0u) memmove(out, in, count);
+    recomp_runtime.registers.eax = to;
+    recomp_runtime.registers.esp += 4u;   /* the original's ret (cdecl: the caller pops the arguments) */
+}
 /* rand (0x145A40). Online, the calls from 0x140730 and 0x141840 (sound and effects, run as often as the host's
    audio and timing have them, so not as often on both machines) draw from a state of their own, so that the
    game's numbers stay alike on both. */
@@ -693,6 +712,7 @@ RecompFunction recomp_sc2_hooks_lookup_manual(uint32_t address)
     case 0x0001c2b0u: return random_seed;
     case 0x00103a75u: return query_performance_counter;
     case 0x00145a40u: return rand_hook;
+    case 0x00146610u: return memory_move;
     case 0x000331b0u: return layer_2d;
     case 0x0002ed80u: return box_fill;
     case 0x000569b0u: return profile_item;

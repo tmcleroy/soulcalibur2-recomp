@@ -12,6 +12,12 @@ Fixes from players' reports.
   final boss fought both guests in the style it has for Spawn. It now takes the form each guest's own disc has for
   them (the GameCube's for Link, the PlayStation 2's for Heihachi). **Build the guests again** on the launcher's
   Guest page to get it; until then it fights as before. Online, both players need the rebuilt file.
+- **The European disc stopping in fights and in Records**: on the European (PAL) disc, Arcade and Survival stopped with
+  "unresolved indirect call to 0x0014baef" as fighters attacked, and so did opening Options > Records. The C
+  library's memmove, whose last bytes go through a jump table that the European program's translation had one arm
+  short of, is now copied natively on both discs.
+- **The launcher's "Rebuild the guests" notice** now looks only at the guests built for the Xbox disc chosen. A file
+  left from the other release's disc, chosen before, kept asking for a rebuild after this one was rebuilt.
 - **Inferno's moves against Link and Heihachi** ([#90](https://github.com/tmcleroy/soulcalibur2-recomp/issues/90)):
   as against Spawn and Necrid, Inferno now fights them with Nightmare's moves, as it does on the GameCube and the
   PlayStation 2. It took each guest's own moves.
