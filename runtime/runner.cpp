@@ -1011,7 +1011,7 @@ static bool sampleInput(std::uint32_t port, RecompInputGamepad *gamepad)
     if (const char *items = std::getenv("SC2_TEST_ITEMS"))
         if (port == 0u && *recomp_memory_u32(0x398700u) == 5u) {
             unsigned first = 0, last = 0;
-            if (std::sscanf(items, "%u-%u", &first, &last) == 2 && last < 0x116u)
+            if (std::sscanf(items, "%u-%u", &first, &last) == 2 && last < 0x12cu)
                 std::memset(recomp_memory(0x3bb368u + first, last - first + 1u), 3, last - first + 1u);
         }
     if (port == 0u && std::getenv("SC2_TEST_KO") && *recomp_memory_u32(0x398700u) == 7u) {

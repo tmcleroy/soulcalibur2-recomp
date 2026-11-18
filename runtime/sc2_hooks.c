@@ -44,6 +44,7 @@ extern void sub_00145A40(void);
 extern void sub_000344D0(void);
 extern void sub_0002A350(void);
 extern void sub_000DE480(void);
+extern void sub_00056A00(void);
 /* rand (0x145A40). Online, the calls from 0x140730 and 0x141840 (sound and effects, run as often as the host's
    audio and timing have them, so not as often on both machines) draw from a state of their own, so that the
    game's numbers stay alike on both. */
@@ -383,11 +384,36 @@ static void play_counted(void)
 }
 
 /* 0x569F0 (character in eax): the character's own item (its roster place + 0x116), which the game checks
-   (0x56690) and sets (0x57680). With no place the guests had item 277, another's; they take Spawn's. */
+   (0x56690) and sets (0x57680): clearing Arcade gets it, and with it had the Museum's Character Ending shows the
+   character's ending. With no place the guests had item 277, another's; they take Spawn's. The bonus fighters
+   (30-32) have the roster's last three places, so items 299-301, though no endings of their own: 299 is one of the
+   save's spare states, which hold Heihachi's last weapons (sc2_guest_items.c), and 300 and 301 are past the states
+   altogether. Clearing Arcade with Lizardman so gave Heihachi a weapon, and with those weapons had the Museum
+   offered Lizardman's ending, which does not exist (issue #91). They have no item (-1, the game's "none": nothing
+   sets it), and for the Museum it is not had (character_ending, below). */
 static void character_item(void)
 {
+    if (recomp_runtime.registers.eax >= 30u && recomp_runtime.registers.eax <= 32u) {
+        recomp_runtime.registers.eax = 0xffffffffu;
+        recomp_runtime.registers.esp += 4u;   /* the original's ret */
+        return;
+    }
     if (recomp_runtime.registers.eax == 27u || recomp_runtime.registers.eax == 28u) recomp_runtime.registers.eax = 29u;
     sub_000569F0();
+}
+
+/* 0x56A00(character): the state of the character's own item (0 not had, 3 had), by which the Museum lists its
+   Character Ending entry (0x775E0) and opens each cell of that entry's character select (0x6A28A). The bonus
+   fighters have none (character_item): not had, where the game's "none" counts as had. */
+static void character_ending(void)
+{
+    const uint32_t character = *recomp_memory_u32(recomp_runtime.registers.esp + 4u);
+    if (character >= 30u && character <= 32u) {
+        recomp_runtime.registers.eax = 0u;
+        recomp_runtime.registers.esp += 4u;   /* the original's ret */
+        return;
+    }
+    sub_00056A00();
 }
 
 /* The guests' places beside the 24-character roster (0x19CA20): Link 24, Heihachi 25. 0x36A70(character) gives a
@@ -627,6 +653,7 @@ RecompFunction recomp_sc2_hooks_lookup_manual(uint32_t address)
     case 0x000d24f0u: return result_name;
     case 0x000d29a0u: return beaten_list;
     case 0x000569f0u: return character_item;
+    case 0x00056a00u: return character_ending;
     case 0x000dcfa0u: return gallery_grid;
     case 0x000528e0u: return boss_form;
     case 0x0001c2b0u: return random_seed;
