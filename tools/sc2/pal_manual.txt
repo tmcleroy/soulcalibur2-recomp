@@ -5,7 +5,7 @@
 # --- not addresses: constants that fall in the image's range
 0x000343fd keep   # rand's LCG multiplier (sc2_hooks.c)
 0x00269ec3 keep   # rand's LCG increment
-0x003bf0f8 keep   # an offset added to the pool pointer (sc2_wm_select.c pool())
+0x003bf0f8 0x003d10f8   # an offset added to the pool pointer (sc2_wm_select.c pool()): 0xF2470 in US, 0xF68D0 in PAL
 0x00382010 keep   # DirectSound buffer-description flags mask (dsound_buffer_adapter.c)
 
 # --- code: shape-only matches, confirmed by callers or by identical shape at the same distance
@@ -57,3 +57,4 @@
 0x000fb088 0x000ffef8   # the shop step's return from 0x580A0 (PAL 0x59640: its only caller outside 0x59xxx)
 0x000fa408 0x000feb09   # the select build's return from 0xB81B0 (PAL 0xBB3D0; the one call inside PAL 0xFE700's function)
 0x0034eed0 0x00360a30   # the weapon gallery's table: PAL 0xE3100 (US 0xDF110) copies 19 rows from it, to 0x360AC8
+0x00373f58 0x00385b9c   # the vblank count (sc2_hooks.c frame_begins): written by the vblank callback alone, 0x2DA40 in US, 0x2E320 in PAL
