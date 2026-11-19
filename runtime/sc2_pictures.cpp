@@ -184,7 +184,7 @@ int ExportPictures(const std::string &folder, std::string &error)
     int written = 0, failed = 0, unread = 0;
     for (int gallery = 0; gallery < 3; ++gallery) {
         int number = 0;
-        for (int slot = 0; slot < 45; ++slot) {
+        for (int slot = 0; slot < 54; ++slot) {   /* (GalleryPicture: -1 past a gallery's grid) */
             const int32_t picture = GalleryPicture(gallery, slot);
             if (picture < 0) continue;
             ++number;

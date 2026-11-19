@@ -13,7 +13,9 @@ the GameCube, SLUS_206.43 on the PS2). What goes where:
       32, Heihachi's at 18 and 34.
   /2: each guest's select-screen entries in its own places (the versions keep one entry per character, empty
       for the others: Link's at 84, 146, 178, 284, 422, 470-472; Heihachi's at 85, 147, 179, 285, 423,
-      473-474); its grid icons appended to /2/5 part 2 and its large icons to /2/9 and /2/10 part 0.
+      473-474); their Special pictures, which the Xbox has Spawn's of at 493 and 495, at 479-480 (Link) and
+      481-482 (Heihachi), entries the disc leaves empty; its grid icons appended to /2/5 part 2 and its large
+      icons to /2/9 and /2/10 part 0, and its Art Gallery thumbnails to /2/395-397.
 
 The profile (slot 38): 'GPRF', u32 character, u32 offset of the select-name glyph string (or 0), u32 offset of
 the character's select-grid cell (36 bytes in the Xbox's byte order: s16 character, s16 costumes, u32
@@ -144,8 +146,12 @@ def _new_block(x4, entries, make):
 # (/2 index the conversion gives, the guest's own): its profile, voices, select art, portrait, poses, and the picture
 # its profile's unlock shows (/2/297 + its profile item: 48 Link, 49 Heihachi, runtime/sc2_guest.cpp; the guest
 # slot's costume picture on its disc)
-LINK_UI = [(86, 84), (148, 146), (180, 178), (286, 284), (424, 422), (475, 470), (476, 471), (477, 472), (343, 345)]
-HEIHACHI_UI = [(86, 85), (148, 147), (180, 179), (286, 285), (424, 423), (475, 473), (476, 474), (343, 346)]
+# and their own Special pictures (the two black-and-white pictures with Soul Edge and Soul Calibur, which the Xbox
+# has Spawn's of: 493 and 495) in /2 entries the disc leaves empty
+LINK_UI = [(86, 84), (148, 146), (180, 178), (286, 284), (424, 422), (475, 470), (476, 471), (477, 472), (343, 345),
+           (493, 479), (495, 480)]
+HEIHACHI_UI = [(86, 85), (148, 147), (180, 179), (286, 285), (424, 423), (475, 473), (476, 474), (343, 346),
+               (493, 481), (495, 482)]
 
 
 class Layout:
@@ -182,12 +188,12 @@ def build_roster(xbox_path, gc_path, ps2_path, output):
     e4 = e4 + [None] * 78
     t4 = t4 + t4[SPAWN_BLOCK:SPAWN_BLOCK + 39] * 2
     icons_x = pack_parts(x2.bytes(5))
-    # The Art Gallery's thumbnails (runtime/sc2_guest.cpp, the gallery's slots): Hi-Res's (/2/395) gets Link's
-    # portrait, then Heihachi's and his two illustrations (Illustrations has room for three only); Illustrations'
-    # (/2/396) gets Link's three. Each from the guest slot's textures on its disc.
-    hires_entry, illus_entry = layout.ui(395), layout.ui(396)
-    hires, illus = x2.bytes(hires_entry), x2.bytes(illus_entry)
-    hires_new, illus_new = [], []
+    # The Art Gallery's thumbnails (runtime/sc2_guest.cpp, ApplyGallery), Link's first: Hi-Res's (/2/395) gets their
+    # portraits, Illustrations' (/2/396) Link's three and Heihachi's two, Special's (/2/397) their two pictures with
+    # Soul Edge and Soul Calibur. Each from the guest slot's textures on its disc.
+    hires_entry, illus_entry, special_entry = layout.ui(395), layout.ui(396), layout.ui(397)
+    hires, illus, special = x2.bytes(hires_entry), x2.bytes(illus_entry), x2.bytes(special_entry)
+    hires_new, illus_new, special_new = [], [], []
     small, large9, large10 = icons_x[2], x2.bytes(9), pack_parts(x2.bytes(10))
     small_new, large9_new, large10_new = [], [], []
 
@@ -212,6 +218,8 @@ def build_roster(xbox_path, gc_path, ps2_path, output):
         hires_new.append((_flags(hires, 20),) + textures.c8_texture(g2.bytes(395), 20))
         for k in (20, 35, 41):
             illus_new.append((_flags(illus, k),) + textures.c8_texture(g2.bytes(396), k))
+        for k in (5, 7):
+            special_new.append((_flags(special, k),) + textures.c8_texture(g2.bytes(397), k))
 
     if ps2_path:
         proot = Olnk.open(ps2_path)
@@ -233,15 +241,19 @@ def build_roster(xbox_path, gc_path, ps2_path, output):
             small_new.append((_flags(small, 51),) + picons.texture(51 + k).paletted())
             large9_new.append((_flags(large9, 98),) + p9.texture(98 + k).paletted())
             large10_new.append((_flags(large10[0], layout.large(100)),) + p10.texture(100 + k).paletted())
-        p395, p396 = ps2tex.Bank(p2.bytes(395)), ps2tex.Bank(p2.bytes(396))
+        p395, p396, p397 = ps2tex.Bank(p2.bytes(395)), ps2tex.Bank(p2.bytes(396)), ps2tex.Bank(p2.bytes(397))
         hires_new.append((_flags(hires, 20),) + p395.texture(20).paletted())
         for k in (20, 35):
-            hires_new.append((_flags(hires, 20),) + p396.texture(k).paletted())
+            illus_new.append((_flags(illus, k),) + p396.texture(k).paletted())
+        for k in (5, 7):
+            special_new.append((_flags(special, k),) + p397.texture(k).paletted())
 
     if hires_new:
         e2[hires_entry] = textures.append_p8(hires, hires_new)
     if illus_new:
         e2[illus_entry] = textures.append_p8(illus, illus_new)
+    if special_new:
+        e2[special_entry] = textures.append_p8(special, special_new)
     icons_x[2] = textures.append_p8(small, small_new)
     e2[5] = build_pack(icons_x, alignment=pack_alignment(x2.bytes(5)))
     e2[9] = textures.append_p8(large9, large9_new)

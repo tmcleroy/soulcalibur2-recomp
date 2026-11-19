@@ -47,7 +47,7 @@ const UiEntry GUEST_UI[] = {
     {84, 86, UiEntry::Profile},    {146, 148, UiEntry::Sound},  {178, 180, UiEntry::Sound},
     {284, 286, UiEntry::Paletted}, {343, 343, UiEntry::Rgba8},  {344, 344, UiEntry::Rgba8},
     {422, 424, UiEntry::Rgba8},    {470, 475, UiEntry::Rgba8},  {471, 476, UiEntry::Rgba8},
-    {472, 477, UiEntry::Rgba8},
+    {472, 477, UiEntry::Rgba8},    {493, 493, UiEntry::Rgba8},  {495, 495, UiEntry::Rgba8},
 };
 const uint32_t GUEST_ICONS[][2] = {{51, 51}, {52, 52}};   /* (Xbox, GameCube) in /2/5 part 2 */
 struct GuestTexture {
@@ -55,7 +55,8 @@ struct GuestTexture {
     int part;   /* -1: the entry is the bank */
     uint32_t texture;
 };
-const GuestTexture GUEST_TEXTURES[] = {{203, 0, 19}, {395, -1, 20}, {396, -1, 20}, {396, -1, 35}, {396, -1, 41}};
+const GuestTexture GUEST_TEXTURES[] = {{203, 0, 19}, {395, -1, 20}, {396, -1, 20}, {396, -1, 35}, {396, -1, 41},
+                                       {397, -1, 5}, {397, -1, 7}};
 struct GuestText {
     uint32_t entry, spawn, link, count;
 };
@@ -67,7 +68,7 @@ const UiEntry HEIHACHI_UI[] = {
     {85, 86, UiEntry::Profile},    {147, 148, UiEntry::Sound},  {179, 180, UiEntry::Sound},
     {285, 286, UiEntry::Paletted}, {343, 343, UiEntry::Rgba8},  {344, 344, UiEntry::Rgba8},
     {423, 424, UiEntry::Rgba8},    {473, 475, UiEntry::Rgba8},  {474, 476, UiEntry::Rgba8},
-    {473, 477, UiEntry::Rgba8},
+    {473, 477, UiEntry::Rgba8},    {493, 493, UiEntry::Rgba8},  {495, 495, UiEntry::Rgba8},
 };
 struct Ps2Texture_ {
     uint32_t entry;
@@ -75,7 +76,7 @@ struct Ps2Texture_ {
     uint32_t texture, ps2_texture;
 };
 const Ps2Texture_ HEIHACHI_TEXTURES[] = {{203, 0, 19, 19}, {395, -1, 20, 20}, {396, -1, 20, 20}, {396, -1, 35, 35},
-                                         {396, -1, 41, 20},
+                                         {396, -1, 41, 20}, {397, -1, 5, 5},   {397, -1, 7, 7},
                                          {9, -1, 98, 98},   {9, -1, 99, 99},   {10, 0, 100, 100}, {10, 0, 101, 101}};   /* silhouettes */
 
 std::vector<Bytes> parts_of(const Bytes &data, bool big_endian)
@@ -463,9 +464,9 @@ constexpr uint32_t ROSTER_LINK_BLOCK = 46 + 39 * 24, ROSTER_HEIHACHI_BLOCK = 46 
 /* (/2 index the conversion gives, the guest's own; the last, the picture its profile's unlock shows: /2/297 + its profile
    item, 48 Link and 49 Heihachi, runtime/sc2_guest.cpp. As the US disc numbers them: Layout gives the European's.) */
 const uint32_t LINK_OWN_UI[][2] = {{86, 84}, {148, 146}, {180, 178}, {286, 284}, {424, 422}, {475, 470}, {476, 471}, {477, 472},
-    {343, 345}};
+    {343, 345}, {493, 479}, {495, 480}};
 const uint32_t HEIHACHI_OWN_UI[][2] = {{86, 85}, {148, 147}, {180, 179}, {286, 285}, {424, 423}, {475, 473}, {476, 474},
-    {343, 346}};
+    {343, 346}, {493, 481}, {495, 482}};
 
 /* A program's memory: (file offset, address, size) a section, in its byte order. */
 struct Program {
@@ -591,11 +592,12 @@ void build_guests_root(const DiscFile &xbox, const DiscFile *gamecube, const Dis
     auto large10 = parts_of(x2.bytes(10), false);
     const Bytes small = icons.at(2), large9 = x2.bytes(9);
     std::vector<std::pair<uint32_t, Paletted>> small_new, large9_new, large10_new;
-    /* The Art Gallery's thumbnails (runtime/sc2_guest.cpp, ApplyGallery): Hi-Res's (/2/395) gets Link's portrait,
-       then Heihachi's and his two illustrations; Illustrations' (/2/396) gets Link's three. */
-    const uint32_t hires_entry = layout.ui(395), illus_entry = layout.ui(396);
-    const Bytes hires = x2.bytes(hires_entry), illus = x2.bytes(illus_entry);
-    std::vector<std::pair<uint32_t, Paletted>> hires_new, illus_new;
+    /* The Art Gallery's thumbnails (runtime/sc2_guest.cpp, ApplyGallery), Link's first: Hi-Res's (/2/395) gets their
+       portraits, Illustrations' (/2/396) Link's three and Heihachi's two, Special's (/2/397) their two pictures with
+       Soul Edge and Soul Calibur. */
+    const uint32_t hires_entry = layout.ui(395), illus_entry = layout.ui(396), special_entry = layout.ui(397);
+    const Bytes hires = x2.bytes(hires_entry), illus = x2.bytes(illus_entry), special = x2.bytes(special_entry);
+    std::vector<std::pair<uint32_t, Paletted>> hires_new, illus_new, special_new;
 
     if (gamecube) {
         const Olnk groot(gamecube->read, 0), g4 = groot.child(4), g2 = groot.child(2);
@@ -615,9 +617,10 @@ void build_guests_root(const DiscFile &xbox, const DiscFile *gamecube, const Dis
             large9_new.emplace_back(entry_flags(large9, 98), c8_texture(g9, 98 + k));
             large10_new.emplace_back(entry_flags(large10.at(0), layout.large(100)), c8_texture(g10, 100 + k));
         }
-        const Bytes g395 = g2.bytes(395), g396 = g2.bytes(396);
+        const Bytes g395 = g2.bytes(395), g396 = g2.bytes(396), g397 = g2.bytes(397);
         hires_new.emplace_back(entry_flags(hires, 20), c8_texture(g395, 20));
         for (uint32_t k : {20u, 35u, 41u}) illus_new.emplace_back(entry_flags(illus, k), c8_texture(g396, k));
+        for (uint32_t k : {5u, 7u}) special_new.emplace_back(entry_flags(special, k), c8_texture(g397, k));
         step();
     }
     if (ps2) {
@@ -641,14 +644,16 @@ void build_guests_root(const DiscFile &xbox, const DiscFile *gamecube, const Dis
             large9_new.emplace_back(entry_flags(large9, 98), p9.texture(98 + k).paletted());
             large10_new.emplace_back(entry_flags(large10.at(0), layout.large(100)), p10.texture(100 + k).paletted());
         }
-        const Bytes p395_data = p2.bytes(395), p396_data = p2.bytes(396);
-        Ps2Bank p395(p395_data), p396(p396_data);
+        const Bytes p395_data = p2.bytes(395), p396_data = p2.bytes(396), p397_data = p2.bytes(397);
+        Ps2Bank p395(p395_data), p396(p396_data), p397(p397_data);
         hires_new.emplace_back(entry_flags(hires, 20), p395.texture(20).paletted());
-        for (uint32_t k : {20u, 35u}) hires_new.emplace_back(entry_flags(hires, 20), p396.texture(k).paletted());
+        for (uint32_t k : {20u, 35u}) illus_new.emplace_back(entry_flags(illus, k), p396.texture(k).paletted());
+        for (uint32_t k : {5u, 7u}) special_new.emplace_back(entry_flags(special, k), p397.texture(k).paletted());
         step();
     }
     if (!hires_new.empty()) e2.at(hires_entry) = append_p8(hires, hires_new);
     if (!illus_new.empty()) e2.at(illus_entry) = append_p8(illus, illus_new);
+    if (!special_new.empty()) e2.at(special_entry) = append_p8(special, special_new);
     icons.at(2) = append_p8(small, small_new);
     e2.at(5) = build_pack(icons, pack_alignment(x2.bytes(5)));
     e2.at(9) = append_p8(large9, large9_new);

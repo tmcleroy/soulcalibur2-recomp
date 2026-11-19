@@ -40,6 +40,8 @@ GUEST_UI = [
     (470, 475, "rgba8"),        # poses
     (471, 476, "rgba8"),
     (472, 477, "rgba8"),
+    (493, 493, "rgba8"),        # Special: the black-and-white pictures with Soul Edge and Soul Calibur
+    (495, 495, "rgba8"),
 ]
 
 
@@ -68,6 +70,8 @@ GUEST_TEXTURES = [
     (396, None, 20), # poses
     (396, None, 35),
     (396, None, 41),
+    (397, None, 5),  # Special's black-and-white pictures
+    (397, None, 7),
 ]
 
 
@@ -277,11 +281,13 @@ HEIHACHI_UI = [
     (473, 475, "rgba8"),
     (474, 476, "rgba8"),
     (473, 477, "rgba8"),
+    (493, 493, "rgba8"),
+    (495, 495, "rgba8"),
 ]
 # Single textures inside banks both discs have, at the same places (the PS2's in brackets where it differs):
 # (/2 entry, pack part or None, texture, PS2 texture)
 HEIHACHI_TEXTURES = [(203, 0, 19, 19), (395, None, 20, 20), (396, None, 20, 20), (396, None, 35, 35),
-                     (396, None, 41, 20),
+                     (396, None, 41, 20), (397, None, 5, 5), (397, None, 7, 7),
                      (9, None, 98, 98), (9, None, 99, 99), (10, 0, 100, 100), (10, 0, 101, 101)]   # silhouettes
 
 

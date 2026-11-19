@@ -11,6 +11,11 @@ Fixes from players' reports.
   Lizardman, Assassin and Berserker are left out of Character Profiles' and Character Ending's character select (their
   cells empty, as on the other consoles). They have neither a profile nor an ending; Character Ending showed them
   greyed, as if still to be unlocked, and Character Profiles let them be chosen.
+- **Link's and Heihachi's pictures in the Art Gallery** ([#96](https://github.com/tmcleroy/soulcalibur2-recomp/issues/96)):
+  Heihachi's two illustrations are in Illustrations (a tenth column), as on the PlayStation 2, not in Hi-Res. Special
+  has a third row with the GameCube's and the PlayStation 2's own versions of the two black-and-white pictures with
+  Soul Edge and Soul Calibur (Link's and Heihachi's, where the Xbox has Spawn's). **Build the guests again** on the
+  launcher's Guest page to get them.
 - **Inferno against Link and Heihachi** ([#90](https://github.com/tmcleroy/soulcalibur2-recomp/issues/90)): the
   final boss fought both guests in the style it has for Spawn. It now takes the form each guest's own disc has for
   them (the GameCube's for Link, the PlayStation 2's for Heihachi). **Build the guests again** on the launcher's

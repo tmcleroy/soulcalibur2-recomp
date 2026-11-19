@@ -208,7 +208,9 @@ Press **Rebuild** after changing discs. The guests then stand in the select scre
 (Link above Heihachi) with their models and outfits, moves, weapons (in the Extra modes, as Spawn's are had),
 voices, select-screen art and their own Arcade endings. In **Weapon Master** they are in a column to the right of
 the grid (Right from its last column). In the **Museum**: their profiles, the Exhibition and Battle Theaters, and
-their pictures in the Art Gallery (Hi-Res gets a fifth row; Illustrations ends with Link's three).
+their pictures in the Art Gallery, in the galleries their own discs have them in: their portraits in Hi-Res (a fifth
+row), Link's three and Heihachi's two illustrations in Illustrations (a tenth column), and in Special (a third row)
+their own versions of the two black-and-white pictures with Soul Edge and Soul Calibur.
 
 Clearing Arcade with a guest unlocks their profile, as with everyone (after a Rebuild on the Guest page, for a
 guests' file built before 2026-11-01). Their other records and unlocks are the guest slot's (Spawn's). How the conversion works is in [guests.md](guests.md).
