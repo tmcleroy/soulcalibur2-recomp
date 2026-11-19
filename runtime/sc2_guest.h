@@ -30,7 +30,7 @@ bool ApplyGuestRoster(const char *path);
    root.olk, without the guests. */
 bool GuestFileMatches(const char *path);
 
-/* The Art Gallery's picture in a gallery's slot (0 Hi-Res, 1 Illustrations, 2 Special; 45 slots each): its /2
+/* The Art Gallery's picture in a gallery's slot (0 Hi-Res, 1 Illustrations, 2 Special; up to 54 slots each): its /2
    entry in root.olk, as the program's table has it now (with the guests' after ApplyGuestRoster), or -1 for none. */
 int32_t GalleryPicture(int gallery, int slot);
 
@@ -62,7 +62,8 @@ int sc2_guest_weapon_item(uint32_t character, uint32_t weapon);
 void sc2_guest_items_all(void);
 
 /* The Art Gallery's Hi-Res pictures: 20, or more with the guests' (sc2_guest.cpp, ApplyGallery). */
-int sc2_guest_hires_pictures(void);
+void sc2_guest_gallery_open(uint32_t object, uint32_t gallery);
+void sc2_guest_gallery_cells(uint32_t object);
 
 #ifdef __cplusplus
 }
