@@ -6,12 +6,21 @@ Fixes from players' reports.
 
 - **The Museum's Character Ending and the bonus fighters** ([#91](https://github.com/tmcleroy/soulcalibur2-recomp/issues/91)):
   Lizardman, Assassin and Berserker have no endings of their own, but with Heihachi's last weapons had (or everything
-  unlocked from the menu) the Museum offered Lizardman's, and choosing it showed nothing. Their places there stay
-  locked. Clearing Arcade with Lizardman also no longer gives Heihachi a weapon.
+  unlocked from the menu) the Museum offered Lizardman's, and choosing it showed nothing. Clearing Arcade with Lizardman also no longer gives Heihachi a weapon.
+- **The bonus fighters in the Museum** ([#96](https://github.com/tmcleroy/soulcalibur2-recomp/issues/96)):
+  Lizardman, Assassin and Berserker are left out of Character Profiles' and Character Ending's character select (their
+  cells empty, as on the other consoles). They have neither a profile nor an ending; Character Ending showed them
+  greyed, as if still to be unlocked, and Character Profiles let them be chosen.
 - **Inferno against Link and Heihachi** ([#90](https://github.com/tmcleroy/soulcalibur2-recomp/issues/90)): the
   final boss fought both guests in the style it has for Spawn. It now takes the form each guest's own disc has for
   them (the GameCube's for Link, the PlayStation 2's for Heihachi). **Build the guests again** on the launcher's
   Guest page to get it; until then it fights as before. Online, both players need the rebuilt file.
+- **The European disc stopping in fights and in Records**: on the European (PAL) disc, Arcade and Survival stopped with
+  "unresolved indirect call to 0x0014baef" as fighters attacked, and so did opening Options > Records. The C
+  library's memmove, whose last bytes go through a jump table that the European program's translation had one arm
+  short of, is now copied natively on both discs.
+- **The launcher's "Rebuild the guests" notice** now looks only at the guests built for the Xbox disc chosen. A file
+  left from the other release's disc, chosen before, kept asking for a rebuild after this one was rebuilt.
 - **Inferno's moves against Link and Heihachi** ([#90](https://github.com/tmcleroy/soulcalibur2-recomp/issues/90)):
   as against Spawn and Necrid, Inferno now fights them with Nightmare's moves, as it does on the GameCube and the
   PlayStation 2. It took each guest's own moves.

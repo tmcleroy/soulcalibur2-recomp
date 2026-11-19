@@ -349,8 +349,14 @@ bool GuestBusy() {
 
 launcher::Notice GuestNotice(const std::filesystem::path &folder) {
     if (state().building || state().copying) return {};
-    bool earlier = false;   // (either release's file)
+    // (the file for the Xbox disc chosen, which the game reads: one left from the other release's disc, chosen before,
+    // is not asked for again once this one is rebuilt; with no disc chosen yet, either)
+    recomp::Ini prefs(folder / "launcher.ini");
+    prefs.load();
+    const std::string game_file = prefs.get("game", "disc");
+    bool earlier = false;
     for (bool european : {false, true}) {
+        if (!game_file.empty() && european != IsEuropeanDisc(game_file)) continue;
         const std::filesystem::path file = built_file(folder, european);
         earlier = earlier || (is_file(file) && guest::guests_version(file.u8string()) != guest::GUESTS_VERSION);
     }
