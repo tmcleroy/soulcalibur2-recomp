@@ -102,7 +102,9 @@ enum : uint32_t {
     kMeterIdle = 30u,
     kMeterTail = 12u,
     kItems = 0x003bb368u,
-    kItemCount = 0x116u,
+    /* Items 0-277 and the characters' own (0x116 + the roster place, 278-298: had, the Museum shows their endings).
+       299 holds Heihachi's last weapons (sc2_guest_items_all), and the bonus fighters' places have none. */
+    kItemCount = 0x12Bu,
     kItemHad = 3u,
     kItemsPacked = 0x003bb1f0u,
     kItemsPackedBytes = 75u,

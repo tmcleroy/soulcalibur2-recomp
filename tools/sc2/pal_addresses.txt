@@ -335,6 +335,7 @@
 0x0036d691 0x0037f2c1 data-between     # d3d8_state_adapter.c:541
 0x003706f0 0x00382320 data             # runner.cpp:199
 0x00372df8 0x00384a38 data             # runner.cpp:201
+0x00373f58 0x00385b9c manual           # sc2_hooks.c:687
 0x00373f80 0x00385bc8 data             # runner.cpp:217
 0x00382010 keep keep             # dsound_buffer_adapter.c:568
 0x0038fac4 0x003a1704 data             # runner.cpp:218
@@ -362,7 +363,7 @@
 0x003bb23c 0x003ccebc data             # sc2_guest_items.c:35
 0x003bb34c 0x003ccfcc data             # sc2_guest_items.c:33
 0x003bb368 0x003ccfe8 data             # sc2_guest_items.c:31
-0x003bf0f8 keep keep             # sc2_wm_select.c:72
+0x003bf0f8 0x003d10f8 manual           # sc2_wm_select.c:72
 0x003ca00c 0x003dbc8c data             # sc2_hooks.c:227
 0x003cb418 0x003dd0a8 manual           # runner.cpp:218
 0x00604c00 0x006169f0 data-between     # sc2_wm_select.c:104

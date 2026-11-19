@@ -679,9 +679,15 @@ static void box_frame(void)
     sub_0002EC90();
 }
 
-/* 0x32630, the frame routine's (0x2DD40) first call: the start of a frame (sc2_frame.cpp) */
+/* 0x32630, the frame routine's (0x2DD40) first call: the start of a frame (sc2_frame.cpp).
+   The game counts vertical blanks at 0x373F58 in its vblank callback (0x2DA40, given to D3D by 0x14F9F0), which the
+   Xbox's GPU interrupt ran; nothing here runs it, so the count stayed 0. It is the clock of the Records' total play
+   time (0xC4780 adds what it moved each frame) and of the blinking and cycling of several screens' effects. It moves
+   here, a frame a blank, as at full speed (the callback's other work, the frame pacing's, sc2_frame.cpp does). */
+enum { VBLANK_COUNT = 0x00373F58u };
 static void frame_begins(void)
 {
+    ++*recomp_memory_u32(VBLANK_COUNT);
     if (museum_hidden_count && !museum_select_mode()) museum_grid(false);   /* (the Museum's select left) */
     sc2_frame_begins();
     sub_00032630();

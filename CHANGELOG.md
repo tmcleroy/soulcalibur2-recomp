@@ -24,6 +24,15 @@ Fixes from players' reports.
   "unresolved indirect call to 0x0014baef" as fighters attacked, and so did opening Options > Records. The C
   library's memmove, whose last bytes go through a jump table that the European program's translation had one arm
   short of, is now copied natively on both discs.
+- **Weapon Master's character select on the European disc** ([#97](https://github.com/tmcleroy/soulcalibur2-recomp/issues/97)):
+  the 1P frame stayed on the original fighters with Link or Heihachi chosen, and opened on Raphael when one of them
+  was the character already. The select's sprites were looked for at the US program's place; on the European disc
+  that also wrote into memory nearby.
+- **Total play time in Records** ([#97](https://github.com/tmcleroy/soulcalibur2-recomp/issues/97)) counts again. It
+  stayed at 0:00:00: the game's count of vertical blanks, its clock, was kept by a callback the Xbox's graphics chip
+  ran and the port did not. The effects that blink or cycle by that clock move with it.
+- **Unlock everything** ([#97](https://github.com/tmcleroy/soulcalibur2-recomp/issues/97)) now also unlocks the
+  characters' endings in the Museum's Character Ending.
 - **The launcher's "Rebuild the guests" notice** now looks only at the guests built for the Xbox disc chosen. A file
   left from the other release's disc, chosen before, kept asking for a rebuild after this one was rebuilt.
 - **Inferno's moves against Link and Heihachi** ([#90](https://github.com/tmcleroy/soulcalibur2-recomp/issues/90)):
