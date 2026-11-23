@@ -281,6 +281,10 @@ const launcher::Description &launcher::describe() {
         d.online.delay_argument = "--net-delay"; // (the host's, sent to the one who joins: runtime/sc2_netplay.cpp)
         d.online_page = true;            // (online play on its own page, after Game)
         d.own_pages_after_game = true;   // (Game, Online, then Guest and Textures)
+        d.community_url = "https://discord.gg/FSC9GZ6nm"; // (at the top of the Online page)
+        d.community_title = "Join us on Discord";
+        d.community_detail = "Find players for a match, tell us what to fix or add, and hear about new versions first.";
+        d.community_button = "Open Discord";
         d.bindings = sc2::BindingTable();
         d.controls_heading = "WHILE PLAYING";
         d.controls = {{"Keys", "Esc or F1: menu (sound, quit)   F11: full screen. On a gamepad: Back opens and "

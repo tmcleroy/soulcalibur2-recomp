@@ -4,6 +4,8 @@
 
 Fixes from players' reports.
 
+- **A Discord link** at the top of the launcher's Online page: where to find players for a match, tell us what to fix
+  or add, and hear about new versions first.
 - **The Museum's Character Ending and the bonus fighters** ([#91](https://github.com/tmcleroy/soulcalibur2-recomp/issues/91)):
   Lizardman, Assassin and Berserker have no endings of their own, but with Heihachi's last weapons had (or everything
   unlocked from the menu) the Museum offered Lizardman's, and choosing it showed nothing. Clearing Arcade with Lizardman also no longer gives Heihachi a weapon.
