@@ -310,13 +310,19 @@ Still to do:
   Profiles, Exhibition Theater and Battle Theater take the guests as any other
   character. The Art Gallery (table 0x34E578: 45 slots a gallery, each a
   thumbnail in the gallery's bank and the /2 entry of its picture; grid set by
-  0xDCFA0) now has the guests' pictures: the guests' file appends their
-  thumbnails (roster.py; /2/395 Link's portrait, then Heihachi's portrait and
-  his two illustrations, /2/396 Link's three illustrations), and the game fills
-  the slots (sc2_guest.cpp, ApplyGallery): Hi-Res gets a fifth row (Link's and
-  Heihachi's portraits, Heihachi's illustrations, as Illustrations has only three
-  free slots), Illustrations Link's three. The pictures are /2/422-423 and
-  470-474. append_p8 now stores a picture at the next power of two (56 x 56
+  0xDCFA0) now has the guests' pictures, in the galleries their own discs have
+  them in: the guests' file appends their thumbnails (roster.py, Link's first;
+  /2/395 the portraits, /2/396 Link's three illustrations and Heihachi's two,
+  /2/397 their Special pictures), and the game fills the slots (sc2_guest.cpp,
+  ApplyGallery): Hi-Res gets a fifth row, Illustrations a tenth column (six rows would not fit the screen), Special a
+  third. The pictures are /2/422-423, 470-474, and for Special 479-482: each
+  disc has its own versions of Special's /2/493 and 495 (the black-and-white
+  pictures with Soul Edge and Soul Calibur, with Spawn, Link or Heihachi), which
+  the guests' file holds in entries the Xbox disc leaves empty. The program
+  indexes the table gallery x 45 + slot, and Illustrations then has 47: the
+  runtime keeps the galleries and writes the opened one to the table
+  (Illustrations' cells past 45 over Special's first slots), and clears the
+  gallery's list of cell sprites (+0x74, 45 entries) past the 45 (0xDD5B0). append_p8 now stores a picture at the next power of two (56 x 56
   thumbnails in 64 x 64), as the disc does.
 - Records and unlocks go by the 24-place roster (0x19CA20; 0x36A70 gives a
   character's place, 0x36A40 the character at a place). The guests now have

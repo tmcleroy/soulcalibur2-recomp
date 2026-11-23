@@ -29,6 +29,7 @@ extern "C" {
 #include "runtime.h"
 }
 
+#include <algorithm>
 #include <cstdio>
 #include <cstring>
 #include <vector>
@@ -44,7 +45,6 @@ Guest g_guest = Guest::Spawn;
 bool g_roster_link = false;   /* Link as character 27 (ApplyGuestRoster) */
 bool g_roster_column = false; /* a guest in the grid's fifth column */
 bool g_grid_balanced = false; /* the grid laid out in rows of five (BalanceGrid) */
-int g_hires_pictures = 20;    /* the Art Gallery's Hi-Res pictures (sc2_guest_hires_pictures) */
 bool g_guest_loaded[2];       /* Link, Heihachi in the guests' file (sc2_guest_loaded) */
 bool g_profile_item[2];       /* ... with their profile items, 48 and 49 (sc2_guest_profile_item) */
 bool g_boss_form[2];          /* ... with the final boss's form for each (sc2_guest_boss_form) */
@@ -186,28 +186,55 @@ template <typename T> T Get(uint32_t address)
 } // namespace
 
 /* The Art Gallery (0x34E578: 45 slots for each of its galleries, each a thumbnail in its bank and the /2 entry
-   of the picture). The guests' file appends their thumbnails (tools/guests/roster.py): to Hi-Res's bank (/2/395)
-   Link's portrait (21), then Heihachi's and his two illustrations; to Illustrations' (/2/396) Link's three
-   (43-45), in its three free slots. Their pictures are the file's /2/422-423 (portraits) and 470-474
-   (illustrations), as the US disc numbers them (Ui). Hi-Res then has more than its 5 x 4 (sc2_hooks.c makes it 5 x 5). */
-static void ApplyGallery(bool link, bool heihachi)
+   of the picture; -1 none; the program indexes it gallery x 45 + slot, and lays each gallery out in a grid set by
+   0xDCFA0: Hi-Res 5 x 4, Illustrations 9 x 5, Special 5 x 2). The guests' pictures, as their own discs have them
+   (tools/guests/roster.py appends their thumbnails to each gallery's bank, Link's first):
+   - Hi-Res (/2/395): their portraits (/2/422 Link, 423 Heihachi);
+   - Illustrations (/2/396): Link's three (470-472), then Heihachi's two (473, 474);
+   - Special (/2/397): their own versions of the two black-and-white pictures with Soul Edge and Soul Calibur, where
+     the Xbox has Spawn's (/2/493 and 495): Link's (the file's 479, 480), Heihachi's (481, 482).
+   A guests' file built before that (GUESTS_VERSION 4) has Heihachi's illustrations after the portraits in Hi-Res and
+   nothing for Special. Illustrations then holds 47 pictures, past its 45 slots: the galleries are kept here, and the
+   one opened is written to the table (Illustrations over Special's first slots; sc2_guest_gallery_open). */
+constexpr int kGallerySlots = 54, kColumns[3] = {5, 9, 5}, kRows[3] = {4, 5, 2};
+int g_gallery_columns[3] = {5, 9, 5};
+int32_t g_gallery[3][kGallerySlots][2];
+int g_gallery_rows[3] = {4, 5, 2};
+bool g_gallery_kept = false;   /* (no guests' file: the program's table as it is) */
+
+static void WriteGallery(int gallery, int slots)
 {
-    auto slot = [](int gallery, int at, int32_t thumbnail, int32_t picture) {
-        const int32_t row[2] = {thumbnail, picture};
-        std::memcpy(recomp_memory(kGallery + 8u * uint32_t(gallery * 45 + at), sizeof row), row, sizeof row);
-    };
-    int at = 20, thumbnail = 21;
-    if (link) slot(0, at++, thumbnail++, int32_t(Ui(422)));
-    if (heihachi) {
-        slot(0, at++, thumbnail++, int32_t(Ui(423)));
-        slot(0, at++, thumbnail++, int32_t(Ui(473)));
-        slot(0, at++, thumbnail++, int32_t(Ui(474)));
+    std::memcpy(recomp_memory(kGallery + 8u * uint32_t(gallery * 45), 8u * uint32_t(slots)), g_gallery[gallery],
+                8u * uint32_t(slots));
+}
+
+static void ApplyGallery(bool link, bool heihachi, bool special)
+{
+    for (int g = 0; g < 3; ++g) {
+        std::memcpy(g_gallery[g], recomp_memory(kGallery + 8u * uint32_t(g * 45), 8u * 45u), 8u * 45u);
+        for (int at = 45; at < kGallerySlots; ++at) g_gallery[g][at][0] = g_gallery[g][at][1] = -1;
     }
-    g_hires_pictures = at;
-    for (int rest = at; rest < 25 && at > 20; ++rest) slot(0, rest, -1, -1);
-    if (link) {
-        for (int k = 0; k < 3; ++k) slot(1, 42 + k, 43 + k, int32_t(Ui(470u + uint32_t(k))));
+    std::vector<std::pair<int32_t, int32_t>> add[3];   /* (thumbnail, picture) after each gallery's own */
+    int32_t thumbnail[3] = {21, 43, 11};               /* each bank's first appended */
+    auto put = [&](int g, uint32_t picture) { add[g].emplace_back(thumbnail[g]++, int32_t(Ui(picture))); };
+    if (link) put(0, 422);
+    if (heihachi) put(0, 423);
+    if (heihachi && !special) put(0, 473), put(0, 474);
+    if (link) put(1, 470), put(1, 471), put(1, 472);
+    if (heihachi && special) put(1, 473), put(1, 474);
+    if (link && special) put(2, 479), put(2, 480);
+    if (heihachi && special) put(2, 481), put(2, 482);
+    const int first[3] = {20, 42, 10};
+    for (int g = 0; g < 3; ++g) {
+        int at = first[g];
+        for (const auto &[t, picture] : add[g]) g_gallery[g][at][0] = t, g_gallery[g][at][1] = picture, ++at;
+        /* (a row more, or for Illustrations, whose five rows of nine fill the screen's height, a tenth column) */
+        g_gallery_columns[g] = g == 1 && at > kColumns[g] * kRows[g] ? kColumns[g] + 1 : kColumns[g];
+        g_gallery_rows[g] = std::max(kRows[g], (at + g_gallery_columns[g] - 1) / g_gallery_columns[g]);
+        for (; at < g_gallery_columns[g] * g_gallery_rows[g]; ++at) g_gallery[g][at][0] = g_gallery[g][at][1] = -1;
+        WriteGallery(g, 45);
     }
+    g_gallery_kept = true;
 }
 
 /* The grid in rows of five (issue #6). The guests are first put in the fifth column (cells 4 and 9); here every
@@ -254,8 +281,9 @@ static void BalanceGrid()
 
 int32_t GalleryPicture(int gallery, int slot)
 {
-    if (gallery < 0 || gallery > 2 || slot < 0 || slot >= 45) return -1;
-    const int32_t picture = Get<int32_t>(kGallery + 8u * uint32_t(gallery * 45 + slot) + 4u);
+    if (gallery < 0 || gallery > 2 || slot < 0 || slot >= g_gallery_columns[gallery] * g_gallery_rows[gallery]) return -1;
+    const int32_t picture = g_gallery_kept ? g_gallery[gallery][slot][1]
+                                           : Get<int32_t>(kGallery + 8u * uint32_t(gallery * 45 + slot) + 4u);
     return picture > 0 ? picture : -1;
 }
 
@@ -285,14 +313,23 @@ bool ApplyGuestRoster(const char *path)
     /* (the picture each guest's profile unlock shows, /2/345 and /2/346: a guests' file built before these has none,
        and the game would wait for it for ever, so the guest keeps the Xbox's none) */
     bool picture[2] = {false, false};
-    uint64_t ui;
+    uint64_t ui = 0;
     uint32_t ui_size;
-    if (ok && Entry(f, 0, 2, ui, ui_size)) {
+    const bool have_ui = ok && Entry(f, 0, 2, ui, ui_size);
+    if (have_ui) {
         for (int g = 0; g < 2; ++g) {
             uint64_t at;
             uint32_t length;
             picture[g] = Entry(f, ui, Ui(345u + uint32_t(g)), at, length) && length != 0u;
         }
+    }
+    /* (the guests' Special pictures, /2/479 and 481: a guests' file built before these has none, and Heihachi's
+       illustrations in Hi-Res; ApplyGallery) */
+    bool special = false;
+    for (uint32_t us : {479u, 481u}) {
+        uint64_t at;
+        uint32_t length;
+        special = special || (have_ui && Entry(f, ui, Ui(us), at, length) && length != 0u);
     }
     /* (the final boss's form for each guest, /4 entries 7 and 23 + the form: Link's 9, Heihachi's 11, as on their
        own discs; tools/guests/forms.py. A guests' file built before these has none.) */
@@ -377,7 +414,7 @@ bool ApplyGuestRoster(const char *path)
                      guest.character, guest.block, guest.cell);
     }
     if (g_roster_column) BalanceGrid();
-    ApplyGallery(!profiles[0].empty(), !profiles[1].empty());   /* (Link, Heihachi) */
+    ApplyGallery(!profiles[0].empty(), !profiles[1].empty(), special);   /* (Link, Heihachi) */
     /* Their profiles, items of their own: the two the game leaves empty (48, 49), as every character's profile item
        is (kind 3, the character's picture 156 + its ID; the unlock's picture at /2/297 + the item, built from the
        guest's disc, tools/guests/roster.py); sc2_hooks.c, profile_item, gives them to Link and Heihachi, so that
@@ -397,9 +434,31 @@ bool ApplyGuestRoster(const char *path)
 
 } // namespace sc2
 
-extern "C" int sc2_guest_hires_pictures(void)
+/* 0xDCFA0(gallery object, gallery) has set the gallery's grid (sc2_hooks.c, gallery_grid): with the guests' pictures
+   a gallery may have more rows, and the table gets the gallery opened, in full (Illustrations' cells past the 45 over
+   Special's first slots, which are written back when Special opens). */
+extern "C" void sc2_guest_gallery_open(uint32_t object, uint32_t gallery)
 {
-    return sc2::g_hires_pictures;
+    using namespace sc2;
+    if (gallery > 2u || !g_gallery_kept) return;
+    const int g = int(gallery), cells = g_gallery_columns[g] * g_gallery_rows[g];
+    for (int other = 0; other < 3; ++other) WriteGallery(other, 45);
+    WriteGallery(g, cells);
+    *recomp_memory(object + 0x7eu, 1u) = uint8_t(g_gallery_columns[g]);
+    *recomp_memory(object + 0x7du, 1u) = uint8_t(g_gallery_rows[g]);
+    *recomp_memory(object + 0x7cu, 1u) = uint8_t(cells);
+}
+
+/* 0xDD5B0(gallery object) has loaded the opened gallery's thumbnails and cleared the object's list of its cells'
+   sprites (+0x74, after the pictures' room in the work area) for 45 cells; the game goes over every cell of the
+   grid each frame, and skips a cell whose entry is 0. With more cells the entries past the 45 are cleared too. */
+extern "C" void sc2_guest_gallery_cells(uint32_t object)
+{
+    using namespace sc2;
+    int cells = 45;
+    for (int g = 0; g_gallery_kept && g < 3; ++g) cells = std::max(cells, g_gallery_columns[g] * g_gallery_rows[g]);
+    const uint32_t list = Get<uint32_t>(object + 0x74u);
+    for (int cell = 45; list && cell < cells; ++cell) Put<uint32_t>(list + 4u * uint32_t(cell), 0u);
 }
 
 extern "C" int sc2_guest_loaded(uint32_t character)

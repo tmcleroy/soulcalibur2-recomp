@@ -11,6 +11,11 @@ Fixes from players' reports.
   Lizardman, Assassin and Berserker are left out of Character Profiles' and Character Ending's character select (their
   cells empty, as on the other consoles). They have neither a profile nor an ending; Character Ending showed them
   greyed, as if still to be unlocked, and Character Profiles let them be chosen.
+- **Link's and Heihachi's pictures in the Art Gallery** ([#96](https://github.com/tmcleroy/soulcalibur2-recomp/issues/96)):
+  Heihachi's two illustrations are in Illustrations (a tenth column), as on the PlayStation 2, not in Hi-Res. Special
+  has a third row with the GameCube's and the PlayStation 2's own versions of the two black-and-white pictures with
+  Soul Edge and Soul Calibur (Link's and Heihachi's, where the Xbox has Spawn's). **Build the guests again** on the
+  launcher's Guest page to get them.
 - **Inferno against Link and Heihachi** ([#90](https://github.com/tmcleroy/soulcalibur2-recomp/issues/90)): the
   final boss fought both guests in the style it has for Spawn. It now takes the form each guest's own disc has for
   them (the GameCube's for Link, the PlayStation 2's for Heihachi). **Build the guests again** on the launcher's
@@ -19,6 +24,23 @@ Fixes from players' reports.
   "unresolved indirect call to 0x0014baef" as fighters attacked, and so did opening Options > Records. The C
   library's memmove, whose last bytes go through a jump table that the European program's translation had one arm
   short of, is now copied natively on both discs.
+- **Weapon Master's character select on the European disc** ([#97](https://github.com/tmcleroy/soulcalibur2-recomp/issues/97)):
+  the 1P frame stayed on the original fighters with Link or Heihachi chosen, and opened on Raphael when one of them
+  was the character already. The select's sprites were looked for at the US program's place; on the European disc
+  that also wrote into memory nearby.
+- **Total play time in Records** ([#97](https://github.com/tmcleroy/soulcalibur2-recomp/issues/97)) counts again. It
+  stayed at 0:00:00: the game's count of vertical blanks, its clock, was kept by a callback the Xbox's graphics chip
+  ran and the port did not. The effects that blink or cycle by that clock move with it.
+- **Unlock everything** ([#97](https://github.com/tmcleroy/soulcalibur2-recomp/issues/97)) now also unlocks the
+  characters' endings in the Museum's Character Ending.
+- **Fades between screens** ([#97](https://github.com/tmcleroy/soulcalibur2-recomp/issues/97)): leaving a screen, the
+  game keeps its last picture up and fades it to black while the next one loads. Until the first fight the port had
+  no copy of that picture to keep, so leaving the title screen (and the other screens before a fight) cut to the next
+  screen's first, half-drawn frame (the title's "PRESS START" alone on black) and faded that. Not yet on Windows.
+- **Sounds fading out instead of cutting off** ([#97](https://github.com/tmcleroy/soulcalibur2-recomp/issues/97)):
+  most of the game's sounds, voices among them (Inferno's death cry was the one noticed, its tail heard as reverb),
+  are stopped by letting them fade over about two thirds of a second, the Xbox sound chip's volume envelope. The port
+  had no envelope and cut them off at once. The envelope's other shapes (a slow fade to a lower level) are heard too.
 - **The launcher's "Rebuild the guests" notice** now looks only at the guests built for the Xbox disc chosen. A file
   left from the other release's disc, chosen before, kept asking for a rebuild after this one was rebuilt.
 - **Inferno's moves against Link and Heihachi** ([#90](https://github.com/tmcleroy/soulcalibur2-recomp/issues/90)):

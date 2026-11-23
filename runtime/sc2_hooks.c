@@ -38,6 +38,7 @@ extern void sub_000D24F0(void);
 extern void sub_000D29A0(void);
 extern void sub_000569F0(void);
 extern void sub_000DCFA0(void);
+extern void sub_000DD5B0(void);
 extern void sub_000528E0(void);
 extern void sub_0001C2B0(void);
 extern void sub_00145A40(void);
@@ -593,17 +594,24 @@ static void beaten_list(void)
 }
 
 /* 0xDCFA0(gallery object, gallery): sets the Art Gallery's grid, columns at +0x7e and rows at +0x7d (Hi-Res 5 x 4,
-   Illustrations 9 x 5, Special 5 x 2) and their product at +0x7c. With the guests' pictures Hi-Res has more than
-   20 (sc2_guest.cpp, ApplyGallery), and a fifth row. */
+   Illustrations 9 x 5, Special 5 x 2) and their product at +0x7c. With the guests' pictures each gallery has more
+   cells (Hi-Res a fifth row, Illustrations a tenth column, Special a third row; sc2_guest.cpp, ApplyGallery and
+   sc2_guest_gallery_open). */
 static void gallery_grid(void)
 {
     const uint32_t object = *recomp_memory_u32(recomp_runtime.registers.esp + 4u);
     const uint32_t gallery = *recomp_memory_u32(recomp_runtime.registers.esp + 8u);
     sub_000DCFA0();
-    if (gallery == 0u && sc2_guest_hires_pictures() > 20) {
-        *recomp_memory(object + 0x7du, 1u) = 5u;
-        *recomp_memory(object + 0x7cu, 1u) = 25u;
-    }
+    sc2_guest_gallery_open(object, gallery);
+}
+
+/* 0xDD5B0(gallery object): loads the opened gallery's thumbnails and clears its cells' sprites, 45 of them; with a
+   tenth column of Illustrations, the rest too (sc2_guest_gallery_cells). */
+static void gallery_cells(void)
+{
+    const uint32_t object = *recomp_memory_u32(recomp_runtime.registers.esp + 4u);
+    sub_000DD5B0();
+    sc2_guest_gallery_cells(object);
 }
 
 /* 0x331B0 draws the frame's 2D layer (the life bars, timer, names, round and stage text, menus) from a list, each
@@ -671,9 +679,15 @@ static void box_frame(void)
     sub_0002EC90();
 }
 
-/* 0x32630, the frame routine's (0x2DD40) first call: the start of a frame (sc2_frame.cpp) */
+/* 0x32630, the frame routine's (0x2DD40) first call: the start of a frame (sc2_frame.cpp).
+   The game counts vertical blanks at 0x373F58 in its vblank callback (0x2DA40, given to D3D by 0x14F9F0), which the
+   Xbox's GPU interrupt ran; nothing here runs it, so the count stayed 0. It is the clock of the Records' total play
+   time (0xC4780 adds what it moved each frame) and of the blinking and cycling of several screens' effects. It moves
+   here, a frame a blank, as at full speed (the callback's other work, the frame pacing's, sc2_frame.cpp does). */
+enum { VBLANK_COUNT = 0x00373F58u };
 static void frame_begins(void)
 {
+    ++*recomp_memory_u32(VBLANK_COUNT);
     if (museum_hidden_count && !museum_select_mode()) museum_grid(false);   /* (the Museum's select left) */
     sc2_frame_begins();
     sub_00032630();
@@ -750,6 +764,7 @@ RecompFunction recomp_sc2_hooks_lookup_manual(uint32_t address)
     case 0x00055010u: return second_fighter;
     case 0x00046550u: return bonus_fighter;
     case 0x000dcfa0u: return gallery_grid;
+    case 0x000dd5b0u: return gallery_cells;
     case 0x000528e0u: return boss_form;
     case 0x0001c2b0u: return random_seed;
     case 0x00103a75u: return query_performance_counter;

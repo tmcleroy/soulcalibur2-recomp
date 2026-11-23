@@ -38,7 +38,7 @@ void build_guests_root(const DiscFile &xbox, const DiscFile *gamecube, const Dis
    noticed: the launcher asks for a rebuild, and online play compares it (two
    players need the same file). build_guests_root writes it beside the file, as
    <output>.version ("sc2-guests N"). */
-constexpr int GUESTS_VERSION = 4;
+constexpr int GUESTS_VERSION = 5;
 
 /* The version a guests' file was built with: 0 when it has no stamp (built
    before stamps, or a build that did not finish). */
