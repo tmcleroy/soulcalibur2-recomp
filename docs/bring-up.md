@@ -225,7 +225,8 @@ an Arcade win pose skipped at about Swap 3910 with `SC2_TEST_KO=1`).
 Weapon Master's map takes Start for its Command Menu (Weapon Select, Character Select, Shop, Save Data, Exit);
 its progress is saved only by Save Data. The yes/no prompts of the save screens open on No.
 
-Two more test aids: `SC2_TEST_KO=1` empties player 2's health in fights (an
+Two more test aids: `SC2_TEST_KO=1` empties player 2's health in fights (`SC2_TEST_KO=1:N` only up to fight N of a
+Survival run, which then ends on a loss and shows its results; an
 Arcade run to the ending takes about eight minutes headless), and
 `SC2_TEST_ITEMS=FIRST-LAST` owns those items (the item states at 0x3BB368: 3 is
 had) at the title. (Items 278-299 are the characters' own, their endings in the Museum's Demo Theater,
