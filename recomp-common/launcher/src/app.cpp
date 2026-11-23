@@ -515,7 +515,9 @@ void use_language(const recomp::Ini& prefs) {
     }
     int count = 0;
     if (SDL_Locale** locales = SDL_GetPreferredLocales(&count)) {
-        for (int i = 0; i < count; i++) {
+        // (stop at the first empty entry: SDL 3.4 on macOS fits the system's list into 128 bytes and counts the
+        // languages that didn't fit, leaving their entries NULL, so 23 or so preferred languages crashed here)
+        for (int i = 0; i < count && locales[i]; i++) {
             std::string code = locales[i]->language ? locales[i]->language : "";
             if (locales[i]->country) {
                 code += std::string("-") + locales[i]->country;
