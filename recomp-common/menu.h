@@ -53,8 +53,9 @@ struct MenuRow {
         Resume, // closes the menu
         Mute,   // "Mute": off or on, through MenuConfig::muted and setMuted (left out without them)
         Reset,  // "Reset game": Chosen::Reset (the host starts the game again, as if switched off and on)
-        ResetOptions, // "Reset all options": the speed back to full, and Chosen::ResetOptions (the host puts every
-                      // option back as it first was)
+        ResetOptions, // "Reset all options": first asks "Are you sure?" (No, Yes; No chosen at first, Back is No);
+                      // on Yes, the speed back to full, and Chosen::ResetOptions (the host puts every option back as
+                      // it first was)
     };
     Kind kind;
     int id;                  // Action: handed back when chosen
@@ -181,6 +182,15 @@ public:
     }
     // Over a picture of 32-bit pixels (red in the low byte)
     void Draw(uint32_t *pixels, int width, int height) const;
+    // Compact: the rows in the small letters and close together, for a screen of few lines (an arcade monitor at its
+    // 224 or 240): the page's rows all on it at once where they fit, and letters that never run into the next row's.
+    // Off: the rows in letters twice as large (the usual)
+    void SetCompact(bool compact) {
+        m_compact = compact;
+    }
+    bool Compact() const {
+        return m_compact;
+    }
 
 private:
     struct Row {
@@ -196,6 +206,7 @@ private:
     bool Exists(const std::string &page) const;
     void Enter(const std::string &page);
     void Leave();
+    void EndConfirm();
     MenuConfig m_config;
     std::vector<MenuRow> m_first; // the first page's rows as given, groups one after another
     bool m_open = false;
@@ -213,6 +224,12 @@ private:
     };
     mutable std::vector<Shown> m_shown;
     mutable float m_panelLeft = 0, m_panelRight = 0;
+    // (Reset all options asked about: the page of No and Yes is shown in place of the one it was chosen on, and the row
+    // it was on, to go back to)
+    bool m_confirm = false;
+    size_t m_confirmIndex = 0;
+    int m_confirmFrom = 0;
+    bool m_compact = false;
 };
 
 } // namespace recomp
