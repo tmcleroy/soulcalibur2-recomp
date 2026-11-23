@@ -37,6 +37,10 @@ Fixes from players' reports.
   game keeps its last picture up and fades it to black while the next one loads. Until the first fight the port had
   no copy of that picture to keep, so leaving the title screen (and the other screens before a fight) cut to the next
   screen's first, half-drawn frame (the title's "PRESS START" alone on black) and faded that. Not yet on Windows.
+- **Sounds fading out instead of cutting off** ([#97](https://github.com/tmcleroy/soulcalibur2-recomp/issues/97)):
+  most of the game's sounds, voices among them (Inferno's death cry was the one noticed, its tail heard as reverb),
+  are stopped by letting them fade over about two thirds of a second, the Xbox sound chip's volume envelope. The port
+  had no envelope and cut them off at once. The envelope's other shapes (a slow fade to a lower level) are heard too.
 - **The launcher's "Rebuild the guests" notice** now looks only at the guests built for the Xbox disc chosen. A file
   left from the other release's disc, chosen before, kept asking for a rebuild after this one was rebuilt.
 - **Inferno's moves against Link and Heihachi** ([#90](https://github.com/tmcleroy/soulcalibur2-recomp/issues/90)):

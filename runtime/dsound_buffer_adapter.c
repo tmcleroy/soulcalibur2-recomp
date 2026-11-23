@@ -38,6 +38,13 @@ typedef struct Buffer {
     int32_t distance_volume, center_front, center, pan_front, pan_rear; /* hundredths of dB */
     int32_t doppler;                               /* 4096 per octave */
     RecompHrtfVoice hrtf;
+    /* SetEG's amplitude envelope (DSENVELOPEDESC dwEG 1): its mode and times in the APU's 512-sample steps at
+       48 kHz, sustain 0-255; how far the voice is into it, in seconds of output, and its release when StopEx asks
+       for the envelope's (from level release_from, release_at seconds in). */
+    uint32_t eg_mode, eg_delay, eg_attack, eg_hold, eg_decay, eg_release, eg_sustain;
+    double eg_time, eg_release_time;
+    float eg_release_from;
+    bool eg_releasing;
 } Buffer;
 static Buffer buffers[BUFFER_COUNT];
 static void update_3d(Buffer *buffer);
@@ -280,6 +287,54 @@ static void reset_output(Buffer *buffer)
     buffer->hrtf = (RecompHrtfVoice){.filter = filter, .rendered = filter};
 }
 
+enum { EG_DISABLE, EG_DELAY, EG_ATTACK, EG_HOLD, EG_DECAY, EG_SUSTAIN };
+static const double EG_STEP = 512.0 / 48000.0; /* the APU's envelope step, seconds */
+
+/* The amplitude envelope's level t seconds after Play: delay (silent), attack (rising), hold (full), decay (falling
+   to the sustain level), then sustain, each phase linear; a mode past DELAY starts the voice at that phase. */
+static float eg_level(const Buffer *buffer, double t)
+{
+    const double phases[4] = {buffer->eg_delay * EG_STEP, buffer->eg_attack * EG_STEP, buffer->eg_hold * EG_STEP,
+        buffer->eg_decay * EG_STEP};
+    const float sustain = buffer->eg_sustain / 255.0f;
+    if (buffer->eg_mode == EG_DISABLE) return 1.0f;
+    for (uint32_t phase = buffer->eg_mode - 1u; phase < 4u; ++phase) {
+        if (t < phases[phase]) {
+            const float through = (float)(t / phases[phase]);
+            return phase == 0u ? 0.0f : phase == 1u ? through : phase == 2u ? 1.0f : 1.0f - (1.0f - sustain) * through;
+        }
+        t -= phases[phase];
+    }
+    return sustain;
+}
+
+/* Scales a pumped piece by the envelope, sample by sample; true once a release has run out (the rest silent). */
+static bool apply_envelope(Buffer *buffer, uint8_t *pcm, uint32_t bytes, uint32_t bits)
+{
+    if (buffer->eg_mode == EG_DISABLE) return false;
+    const uint32_t frame_bytes = bits / 8u * buffer->channels;
+    const double step = 1.0 / buffer->model.sample_rate;
+    const double release = buffer->eg_release * EG_STEP;
+    bool ended = false;
+    for (uint32_t at = 0u; at + frame_bytes <= bytes; at += frame_bytes) {
+        float level;
+        if (buffer->eg_releasing) {
+            const double into = buffer->eg_time - buffer->eg_release_time;
+            level = into >= release ? 0.0f : buffer->eg_release_from * (float)(1.0 - into / release);
+            ended = ended || into >= release;
+        } else level = eg_level(buffer, buffer->eg_time);
+        buffer->eg_time += step;
+        if (level >= 1.0f) continue;
+        for (uint32_t c = 0u; c < buffer->channels; ++c) {
+            if (bits == 16u) {
+                int16_t v; memcpy(&v, pcm + at + c * 2u, 2u);
+                v = (int16_t)lrintf(v * level); memcpy(pcm + at + c * 2u, &v, 2u);
+            } else pcm[at + c] = (uint8_t)(128 + lrintf((pcm[at + c] - 128) * level));
+        }
+    }
+    return ended;
+}
+
 static void pump(Buffer *buffer, uint64_t now)
 {
     if (!recomp_audio_output_ready()) recomp_stop(2, "dsound:audio-output-failed");
@@ -333,6 +388,11 @@ static void pump(Buffer *buffer, uint64_t now)
             fprintf(stderr, "dsound %llu buf%u heard peak=%d\n", (unsigned long long)now, which, loudest[which]);
             loudest[which] = 0; since[which] = now;
         }
+    }
+    /* The release ran out: the voice ends (what is queued, faded to silence, plays out). */
+    if (apply_envelope(buffer, pcm, bytes, buffer->format == 0x69u ? 16u : buffer->bits)) {
+        recomp_dsound_buffer_stop(&buffer->model, now);
+        buffer->eg_releasing = false;
     }
     if (!recomp_audio_output_ready()) recomp_stop(2, "dsound:audio-output-failed");
     apply_routing(buffer);
@@ -486,6 +546,11 @@ static uint32_t set_data(Buffer *buffer, uint32_t data, uint32_t size)
         memset(storage, buffer->format == 1u && buffer->bits == 8u ? 0x80 : 0, size);
     }
     pump(buffer, now_ms());
+    /* New data on a voice still fading out (StopEx's envelope release): the old sound is over. */
+    if (buffer->eg_releasing) {
+        recomp_dsound_buffer_stop(&buffer->model, now_ms());
+        buffer->eg_releasing = false;
+    }
     reset_output(buffer);
     if (buffer->owned) recomp_kernel_free_pool(buffer->owned);
     buffer->owned = owned;
@@ -669,18 +734,38 @@ static void buffer_call(enum Operation operation, uint32_t arguments)
         uint32_t flags = kernel_arg(4u);
         if (flags & ~3u) recomp_stop(2, "dsound:buffer-play-flags-unbound:%08x", flags);
         pump(buffer, now);
+        /* Play on a voice fading out after StopEx: a new start, not the stopping sound going on. */
+        if (buffer->eg_releasing) {
+            recomp_dsound_buffer_stop(&buffer->model, now);
+            buffer->eg_releasing = false;
+        }
         uint32_t continuing = buffer->model.playing && !(flags & RECOMP_DSOUND_PLAY_FROMSTART);
         result = recomp_dsound_buffer_play(&buffer->model, flags, now);
-        if (!result && !continuing) reset_output(buffer);
+        if (!result && !continuing) {
+            reset_output(buffer);
+            buffer->eg_time = 0.0;
+            buffer->eg_releasing = false;
+        }
         break;
     }
     case STOP_EX: {
         /* StopEx(time, flags). SC2 passes time 0 (now) with flags 0, 1 or 2.
            2 (release waveform) lets a looping sound play out to its end.
-           shortcut: 1 (envelope) stops at once, as no envelope generator is
-           modelled yet (SetEG). */
+           1 (envelope) moves the amplitude envelope to its release: the voice plays on, fading out over the
+           release time from where it is (most of SC2's sounds: 60 steps, 0.64 s; Inferno's #97), and ends with
+           it; with no envelope, or none to release, it stops at once. */
         const uint32_t flags = kernel_arg(4u);
         if (value || kernel_arg(3u) || (flags & ~3u)) recomp_stop(2, "dsound:buffer-stop-ex-unbound");
+        if ((flags & 1u) && buffer->eg_mode != EG_DISABLE && buffer->eg_release && buffer->model.playing) {
+            pump(buffer, now);
+            if (!buffer->eg_releasing) {
+                buffer->eg_release_from = eg_level(buffer, buffer->eg_time);
+                buffer->eg_release_time = buffer->eg_time;
+                buffer->eg_releasing = true;
+            }
+            if (flags & 2u) buffer->model.play_flags &= ~RECOMP_DSOUND_PLAY_LOOPING;
+            break;
+        }
         if (flags == 2u) {
             pump(buffer, now);
             buffer->model.play_flags &= ~RECOMP_DSOUND_PLAY_LOOPING;
@@ -690,6 +775,7 @@ static void buffer_call(enum Operation operation, uint32_t arguments)
         /* fall through: immediate Stop semantics */
     case STOP:
         pump(buffer, now); recomp_dsound_buffer_stop(&buffer->model, now);
+        buffer->eg_releasing = false;
         reset_output(buffer); break;
     case STATUS:
         if (!span(value, 4u)) { result = RECOMP_DSOUND_POINTER_ERROR; break; }
@@ -762,8 +848,8 @@ static void private_release(void)
 static void unbound_stream(void) { recomp_stop(2, "dsound:stream-unbound"); }
 
 /* SetLFO and SetEG(buffer, descriptor), ret 8, which SC2 uses and DOA2U did not.
-   shortcut: the voice model has no LFO or envelope generator yet, so the
-   descriptor is accepted and its modulation not heard; each is named once. */
+   shortcut: the voice model has no LFO and no pitch/filter envelope (dwEG 0, SC2's all off), so their
+   descriptors are accepted and not heard; each is named once. The amplitude envelope is set_envelope's. */
 static void modulation(const char *what)
 {
     static unsigned named;
@@ -776,7 +862,23 @@ static void modulation(const char *what)
 }
 
 static void set_lfo(void) { modulation("LFO"); }
-static void set_envelope(void) { modulation("EG"); }
+/* DSENVELOPEDESC {dwEG, dwMode, dwDelay, dwAttack, dwHold, dwDecay, dwRelease, dwSustain, lPitchScale,
+   lFilterCutOff}: the library's SetEG (0x165600) takes dwEG 1 as the amplitude envelope (0 writes the pitch and
+   filter terms too). SC2 gives most sounds mode 1 (from the delay), full sustain and a 60-step release. */
+static void set_envelope(void)
+{
+    const uint32_t descriptor = kernel_arg(2u);
+    if (!span(descriptor, 32u)) { kernel_return(2u, RECOMP_DSOUND_POINTER_ERROR); return; }
+    const uint32_t *d = recomp_memory_u32(descriptor);
+    if (d[0] != 1u) { modulation("EG"); return; }
+    Buffer *buffer = buffer_at(kernel_arg(1u));
+    pump(buffer, now_ms());
+    if (d[1] > EG_SUSTAIN) recomp_stop(2, "dsound:eg-mode-unbound:%u", d[1]);
+    buffer->eg_mode = d[1]; buffer->eg_delay = d[2] & 0xfffu; buffer->eg_attack = d[3] & 0xfffu;
+    buffer->eg_hold = d[4] & 0xfffu; buffer->eg_decay = d[5] & 0xfffu; buffer->eg_release = d[6] & 0xfffu;
+    buffer->eg_sustain = d[7] & 0xffu;
+    kernel_return(2u, RECOMP_DSOUND_OK);
+}
 
 RecompFunction recomp_dsound_buffer_lookup_manual(uint32_t address)
 {
