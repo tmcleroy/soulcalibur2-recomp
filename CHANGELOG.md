@@ -8,6 +8,8 @@
   Met as any other opponent, they fight on that battle's stage, as Spawn does.
 - **Link and Heihachi on the Survival results** ([#112](https://github.com/tmcleroy/soulcalibur2-recomp/issues/112)):
   the results screen's beaten characters now show them when they were beaten.
+- **Link and Heihachi in Extra Time Attack**: two of its courses fight Spawn at one battle, where the GameCube's
+  fight Link and the PlayStation 2's Heihachi. That battle is now one of the three, as in Extra Survival.
 
 ## 0.6.0-beta.1
 

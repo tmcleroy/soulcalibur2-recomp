@@ -758,16 +758,19 @@ static uint32_t call_guest(uint32_t address, const uint32_t *args, unsigned coun
    PS2's Heihachi (28), on the same stage 4, the guest slot's. With the guests loaded, each of those fights is one of
    the three, one not yet met in the run if there is one, by the game's random number (0x1B660); the outfit is chosen
    again for it as the original chooses one (0x52270: the player's character and outfit, the opponent, -1). The stage
-   is the row's, whoever it is. */
+   is the row's, whoever it is. Time Attack (mode 2) does the same with its courses (0x53890 of the fight: 4-byte rows
+   of character, level, stage): courses 4 and 6 have Spawn where the PS2's have Heihachi. */
 static void next_opponent(void)
 {
     const uint32_t esp = recomp_runtime.registers.esp;
     const uint32_t outfit_out = *recomp_memory_u32(esp + 4u);
     sub_00056250();
-    if (*(int16_t *)(void *)recomp_memory(0x39895eu, 2u) != 6 || recomp_runtime.registers.eax != 29u) return;
+    const int16_t mode = *(int16_t *)(void *)recomp_memory(0x39895eu, 2u);
+    if ((mode != 6 && mode != 2) || recomp_runtime.registers.eax != 29u) return;
     const uint32_t row_args[] = {*recomp_memory_u32(0x398b30u)};
-    const uint32_t row = call_guest(0x52fe0u, row_args, 1u);
-    if (row == 0u || *(int16_t *)(void *)recomp_memory(row, 2u) != 29) return;
+    const uint32_t row = call_guest(mode == 6 ? 0x52fe0u : 0x53890u, row_args, 1u);
+    if (row == 0u) return;
+    if (mode == 6 ? *(int16_t *)(void *)recomp_memory(row, 2u) != 29 : *recomp_memory(row, 1u) != 29u) return;
     uint32_t all[3], fresh[3];
     unsigned n_all = 0, n_fresh = 0;
     for (uint32_t character = 27u; character <= 29u; ++character) {
@@ -786,7 +789,7 @@ static void next_opponent(void)
         const uint32_t outfit = call_guest(0x52270u, outfit_args, 4u);
         *(uint16_t *)(void *)recomp_memory(outfit_out, 2u) = (uint16_t)outfit;
     }
-    fprintf(stderr, "recomp sc2: Survival's guest fight %u: character %u\n", *recomp_memory_u32(0x398b30u), chosen);
+    fprintf(stderr, "recomp sc2: the guest slot's fight %u (mode %d): character %u\n", *recomp_memory_u32(0x398b30u), mode, chosen);
     recomp_runtime.registers.eax = chosen;
 }
 
