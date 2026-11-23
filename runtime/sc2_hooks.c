@@ -50,6 +50,7 @@ extern void sub_00055010(void);
 extern void sub_00046550(void);
 extern void sub_00146610(void);
 extern void sub_0006A1F0(void);
+extern void sub_00056250(void);
 /* memmove (0x146610; memcpy calls it too): the C library's, copied natively. Its last bytes go through small jump
    tables, and on the European disc (0x14B810) the lift lost the arm for none left (the table at 0x14BAA8 reads from
    -7 to 0 and slot 0 was not found), so a copy ending on a whole dword stopped the game ("unresolved indirect call
@@ -569,7 +570,8 @@ static void result_name(void)
 /* 0xD29A0: a result screen's characters beaten in the run, those whose count (0x398B8C, a word by ID, raised as
    each falls) is 1 or more, in the order of the name table's second copy (0x34AD10, 24 rows of 0x22 bytes). The
    guests have counts but no rows: each beaten guest takes, while it runs, the row of a character beaten 0 times
-   (shown by nobody), the table given back after. */
+   (shown by nobody), the table given back after. The results screens reach it through 0xD2980, a jmp to it, which the
+   conversion makes a direct call: that address is hooked too (as the same function), or the guests were never shown. */
 static void beaten_list(void)
 {
     enum { ROWS = 0x34AD10u, ROW = 0x22u, COUNTS = 0x398B8Cu };
@@ -740,9 +742,58 @@ RecompFunction sc2_guest_items_lookup(uint32_t address);
 /* ... and their rows in the Museum's weapon gallery (sc2_guest_gallery.c) */
 RecompFunction sc2_guest_gallery_lookup(uint32_t address);
 
+/* Calls a guest routine (cdecl) with the registers kept; its EAX. */
+static uint32_t call_guest(uint32_t address, const uint32_t *args, unsigned count)
+{
+    const RecompRegisters saved = recomp_runtime.registers;
+    kernel_call_guest(address, args, count);
+    const uint32_t result = recomp_runtime.registers.eax;
+    recomp_runtime.registers = saved;
+    return result;
+}
+
+/* 0x56250(cost-out): the next opponent, by mode. Survival's courses (0x52FE0 of the fight, [0x398B30]: 8-byte rows of
+   character, level, stage, health) draw most opponents (-2) and set some: Spawn (29) at fights 10 and 40 of the
+   courses beyond the first, on stage 4, Necrid on 6, Inferno on 11. The GameCube's courses have Link (27) there and the
+   PS2's Heihachi (28), on the same stage 4, the guest slot's. With the guests loaded, each of those fights is one of
+   the three, one not yet met in the run if there is one, by the game's random number (0x1B660); the outfit is chosen
+   again for it as the original chooses one (0x52270: the player's character and outfit, the opponent, -1). The stage
+   is the row's, whoever it is. */
+static void next_opponent(void)
+{
+    const uint32_t esp = recomp_runtime.registers.esp;
+    const uint32_t outfit_out = *recomp_memory_u32(esp + 4u);
+    sub_00056250();
+    if (*(int16_t *)(void *)recomp_memory(0x39895eu, 2u) != 6 || recomp_runtime.registers.eax != 29u) return;
+    const uint32_t row_args[] = {*recomp_memory_u32(0x398b30u)};
+    const uint32_t row = call_guest(0x52fe0u, row_args, 1u);
+    if (row == 0u || *(int16_t *)(void *)recomp_memory(row, 2u) != 29) return;
+    uint32_t all[3], fresh[3];
+    unsigned n_all = 0, n_fresh = 0;
+    for (uint32_t character = 27u; character <= 29u; ++character) {
+        if (character != 29u && !sc2_guest_loaded(character)) continue;
+        all[n_all++] = character;
+        if (*(uint16_t *)(void *)recomp_memory(0x3bb1a8u + character * 2u, 2u) == 0u) fresh[n_fresh++] = character;
+    }
+    if (n_all < 2u) { recomp_runtime.registers.eax = 29u; return; }
+    const uint32_t *pool = n_fresh != 0u ? fresh : all;
+    const unsigned count = n_fresh != 0u ? n_fresh : n_all;
+    const uint32_t chosen = pool[call_guest(0x1b660u, NULL, 0u) % count];
+    if (chosen != 29u && outfit_out != 0u) {
+        const uint32_t player = *recomp_memory_u32(0x398a08u);
+        const uint32_t outfit_args[] = {(uint32_t)(int32_t)*(int16_t *)(void *)recomp_memory(player + 0x58u, 2u),
+            (uint32_t)(int32_t)*(int16_t *)(void *)recomp_memory(player + 0x64u, 2u), chosen, 0xffffffffu};
+        const uint32_t outfit = call_guest(0x52270u, outfit_args, 4u);
+        *(uint16_t *)(void *)recomp_memory(outfit_out, 2u) = (uint16_t)outfit;
+    }
+    fprintf(stderr, "recomp sc2: Survival's guest fight %u: character %u\n", *recomp_memory_u32(0x398b30u), chosen);
+    recomp_runtime.registers.eax = chosen;
+}
+
 RecompFunction recomp_sc2_hooks_lookup_manual(uint32_t address)
 {
     switch (address) {
+    case 0x00056250u: return next_opponent;
     case 0x00090280u: return movie_scene_update;
     case 0x00044360u: return weapon_bones_set;
     case 0x0003bed0u: return fight_setup;
@@ -759,6 +810,7 @@ RecompFunction recomp_sc2_hooks_lookup_manual(uint32_t address)
     case 0x000f1390u: return character_float;
     case 0x000d24f0u: return result_name;
     case 0x000d29a0u: return beaten_list;
+    case 0x000d2980u: return beaten_list;
     case 0x000569f0u: return character_item;
     case 0x00056a00u: return character_ending;
     case 0x00055010u: return second_fighter;

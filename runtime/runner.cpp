@@ -1019,14 +1019,19 @@ static bool sampleInput(std::uint32_t port, RecompInputGamepad *gamepad)
     }
     if (netEndedShown && port == 0u) endedOverlay();
     /* Test aids (docs/bring-up.md, "Test runs"): SC2_TEST_ITEMS=FIRST-LAST owns those items (0x3BB368) at the
-       title; SC2_TEST_KO=1 empties player 2's health every 240 reads of a fight. */
+       title; SC2_TEST_KO=1 empties player 2's health every 240 reads of a fight (SC2_TEST_KO=1:N up to the Nth fight of a
+       run that counts them, [0x398B30], so the run then ends on a loss and its results show). */
     if (const char *items = std::getenv("SC2_TEST_ITEMS"))
         if (port == 0u && *recomp_memory_u32(0x398700u) == 5u) {
             unsigned first = 0, last = 0;
             if (std::sscanf(items, "%u-%u", &first, &last) == 2 && last < 0x12cu)
                 std::memset(recomp_memory(0x3bb368u + first, last - first + 1u), 3, last - first + 1u);
         }
-    if (port == 0u && std::getenv("SC2_TEST_KO") && *recomp_memory_u32(0x398700u) == 7u) {
+    const char *test_ko = std::getenv("SC2_TEST_KO");
+    unsigned ko_until = 0;
+    if (test_ko && std::strchr(test_ko, ':')) ko_until = static_cast<unsigned>(std::atoi(std::strchr(test_ko, ':') + 1));
+    if (port == 0u && test_ko && *recomp_memory_u32(0x398700u) == 7u &&
+        (ko_until == 0u || *recomp_memory_u32(0x398b30u) <= ko_until)) {
         static std::uint64_t polls;
         if (++polls % 240u == 0u) {
             const float zero = 0.0f;
