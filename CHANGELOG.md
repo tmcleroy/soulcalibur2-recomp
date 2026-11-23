@@ -4,6 +4,11 @@
 
 Fixes from players' reports.
 
+- **No more "code 2" saving in Weapon Master** ([#103](https://github.com/tmcleroy/soulcalibur2-recomp/issues/103)):
+  the game could stop with `kernel:user-apc-queue-full` as it saved. A part of the game that reads files kept up to 64
+  finished reads waiting to be handled, and stopped at the 65th; like the Xbox, it now keeps as many as come.
+- **The mouse cursor hides** ([#102](https://github.com/tmcleroy/soulcalibur2-recomp/issues/102)) over the game's window
+  once the mouse has been still for 2 seconds, and comes back when you move it.
 - **A Discord link** at the top of the launcher's Online page: where to find players for a match, tell us what to fix
   or add, and hear about new versions first.
 - **The Museum's Character Ending and the bonus fighters** ([#91](https://github.com/tmcleroy/soulcalibur2-recomp/issues/91)):
