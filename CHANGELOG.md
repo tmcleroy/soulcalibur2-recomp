@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- **Which gamepad is which player's**: the launcher's Controllers page gives each connected gamepad Automatic,
+  Player 1, Player 2 or Not used, and the game plays them so. A Steam Deck's own controls can be Not used, so two
+  gamepads plugged into it play each other. With nothing chosen the gamepads play in the order connected, as before
+  (recomp-common [#99](https://github.com/tmcleroy/recomp-common/pull/99)).
 - **Link and Heihachi on their own stage in Survival** ([#112](https://github.com/tmcleroy/soulcalibur2-recomp/issues/112)):
   Extra Survival's courses fight Spawn at battles 10 and 40, on his stage, where the GameCube's fight Link and the
   PlayStation 2's Heihachi. Those battles are now one of the three, one not met yet in the run first, on that stage.

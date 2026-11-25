@@ -68,6 +68,10 @@ upstream as its own PR:
   program, fixed-function stages so far (register combiners next). The
   Direct3D 11 backend refuses such draws until it gains the same path; that
   and unit tests for the arena and the generator come before any PR.
+- `input_host_win32.{h,c}` (+ test): `recomp_input_host_set_assign`, the
+  game's choice of which open gamepad plays each port (SC2's: the launcher's
+  Controllers page, `sc2_input.cpp`); without one each seat plays its own
+  port, as before.
 
 The lifter gets every bound address as `--manual-functions`
 (`tools/build_game.py`), so tail jumps into replaced SDK functions go
