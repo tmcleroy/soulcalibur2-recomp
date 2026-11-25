@@ -15,6 +15,9 @@
   version, changed by a tool (trimmed, NKit, re-packed) or cut short now gets a message saying so, where it stopped
   with "not a VGT bank" or "olnk entry cut short". On Android, a disc the system could not read whole is no longer
   taken as copied.
+- **Widescreen in its right shape**: in the game's 16:9 mode the menus, screens and the fight's HUD were stretched by
+  a third, and the fights about 6% too wide. The 2D now keeps its 4:3 shape in the middle of the picture (backgrounds
+  and fades still fill it), and fights are shown at true 16:9.
 
 ## 0.6.0-beta.1
 
