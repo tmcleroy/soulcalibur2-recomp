@@ -115,7 +115,7 @@ Practice mode's own options (the dummy's guard and actions, its attack data) are
 | No damage (each player), One-hit knockouts | Cheats, as in the menu |
 | Ping, Input delay, Hide names | What an online match shows |
 
-Widescreen (the game's own 16:9 mode: menus, fights and the HUD laid out wide), full screen and the free camera are
+Widescreen (the game's own 16:9 mode: fights shown wide, menus, screens and the HUD kept in their 4:3 shape in the middle), full screen and the free camera are
 on the launcher's Game page.
 
 ## Shaders
