@@ -7,6 +7,7 @@
 
 #include "discs.h"
 
+#include <cstdint>
 #include <functional>
 #include <string>
 
@@ -21,6 +22,8 @@ void build_guest_root(const DiscFile &xbox, const DiscFile &gamecube, const std:
 
 /* The game ID the GameCube disc must have (Soulcalibur II, USA). */
 constexpr const char *GAMECUBE_ID = "GRSEAF";
+/* Its root.olk's size: a disc with that ID and another root.olk is another version, or an image a tool changed. */
+constexpr uint64_t GAMECUBE_ROOT_SIZE = 587427840;
 
 /* The same with Heihachi, from the player's PlayStation 2 disc (the port of
    build_guest.py's build_heihachi). */
@@ -46,6 +49,7 @@ int guests_version(const std::string &output);
 
 /* The PS2 disc's program (Soulcalibur II, USA). */
 constexpr const char *PS2_ID = "SLUS_206.43";
+constexpr uint64_t PS2_ROOT_SIZE = 705277952;
 
 } // namespace guest
 

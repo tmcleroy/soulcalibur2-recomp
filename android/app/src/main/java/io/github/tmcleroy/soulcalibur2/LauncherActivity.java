@@ -313,6 +313,11 @@ public class LauncherActivity extends SDLActivity {
                 out.write(buffer, 0, got);
                 importCopiedBytes += got;
             }
+            // (a document whose stream ends before its size: a cloud file or card read that stopped early)
+            if (total > 0 && importCopiedBytes != total) {
+                throw new java.io.IOException("only " + importCopiedBytes + " of " + name + "'s " + total
+                        + " bytes could be read");
+            }
         } catch (Exception e) {
             Log.w("soulcalibur2", "could not copy " + uri + ": " + e);
             if (importErrorMessage == null) {

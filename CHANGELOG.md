@@ -10,6 +10,10 @@
   the results screen's beaten characters now show them when they were beaten.
 - **Link and Heihachi in Extra Time Attack**: two of its courses fight Spawn at one battle, where the GameCube's
   fight Link and the PlayStation 2's Heihachi. That battle is now one of the three, as in Extra Survival.
+- **Building the guests says what is wrong with a disc**: a GameCube or PlayStation 2 disc image that is another
+  version, changed by a tool (trimmed, NKit, re-packed) or cut short now gets a message saying so, where it stopped
+  with "not a VGT bank" or "olnk entry cut short". On Android, a disc the system could not read whole is no longer
+  taken as copied.
 
 ## 0.6.0-beta.1
 
