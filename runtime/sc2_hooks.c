@@ -51,6 +51,7 @@ extern void sub_00046550(void);
 extern void sub_00146610(void);
 extern void sub_0006A1F0(void);
 extern void sub_00056250(void);
+extern void sub_000523A0(void);
 /* memmove (0x146610; memcpy calls it too): the C library's, copied natively. Its last bytes go through small jump
    tables, and on the European disc (0x14B810) the lift lost the arm for none left (the table at 0x14BAA8 reads from
    -7 to 0 and slot 0 was not found), so a copy ending on a whole dword stopped the game ("unresolved indirect call
@@ -793,10 +794,29 @@ static void next_opponent(void)
     recomp_runtime.registers.eax = chosen;
 }
 
+/* 0x523A0(character in EAX): whether a drawn opponent may be that character, by mode. Survival's draws (0x52480)
+   leave out Inferno, Necrid, the guest slot (Spawn, 29), the bonus fighters and two more; the PS2's leave out its
+   own guest, Heihachi (28), the same way, so on every console the guest and Necrid are only met at the fixed
+   battles of the Extra courses, the guest's on the Chapel (stage 4) and Necrid's on the Egyptian Crypt (6)
+   (next_opponent). Link (27) and Heihachi (28) were never available on the Xbox, so its table lets them through:
+   with the guests loaded they came up as drawn opponents, on whatever stage the run was on. Left out here too. */
+static void survival_draw_allowed(void)
+{
+    const uint32_t character = recomp_runtime.registers.eax;
+    if (*(int16_t *)(void *)recomp_memory(0x39895eu, 2u) == 6 && (character == 27u || character == 28u)) {
+        fprintf(stderr, "recomp sc2: Survival's draw leaves out character %u\n", character);
+        recomp_runtime.registers.eax = 0u;
+        recomp_runtime.registers.esp += 4u;   /* the original's ret */
+        return;
+    }
+    sub_000523A0();
+}
+
 RecompFunction recomp_sc2_hooks_lookup_manual(uint32_t address)
 {
     switch (address) {
     case 0x00056250u: return next_opponent;
+    case 0x000523a0u: return survival_draw_allowed;
     case 0x00090280u: return movie_scene_update;
     case 0x00044360u: return weapon_bones_set;
     case 0x0003bed0u: return fight_setup;
