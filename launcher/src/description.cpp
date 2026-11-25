@@ -260,7 +260,7 @@ const launcher::Description &launcher::describe() {
         d.arguments = arguments;
         d.display = {
             {"fullscreen", "Full screen", "F11 switches while playing.", console_session(), nullptr},
-            {"widescreen", "Widescreen", "The game's own 16:9 mode: menus, fights and the HUD laid out wide.", true, nullptr},
+            {"widescreen", "Widescreen", "The game's own 16:9 mode: fights shown wide, menus and the HUD kept in their shape.", true, nullptr},
             {"free_camera", "Free camera", "` (backquote) or clicking the right stick takes the camera and flies it; "
                                           "the same again gives it back.", false, nullptr},
         };

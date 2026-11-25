@@ -172,6 +172,96 @@ static uint32_t stream_vertices(uint32_t first, uint32_t *stride)
     return (uint32_t)offset;
 }
 
+/* SC2's 16:9 mode (the Xbox's widescreen video setting) narrows its cameras' horizontal scale from 0.77 of the
+   vertical (4:3) to 0.612, where the same picture shown 16:9 needs 0.77 x 3/4 = 0.5775: its 3D came out 6% too
+   wide. A perspective projection with the 16:9 mode's ratio is narrowed to it (the x column, about the centre). */
+static void widescreen_projection(float projection[16])
+{
+    static int wide = -1;
+    if (wide < 0) {
+        const char *env = getenv("RECOMP_D3D_WIDESCREEN");
+        wide = env != NULL && env[0] != '\0' && strcmp(env, "0") != 0;
+    }
+    if (!wide || projection[11] == 0.0f || projection[5] == 0.0f) return;
+    const float ratio = fabsf(projection[0] / projection[5]);
+    if (ratio < 0.60f || ratio > 0.625f) return;
+    const float k = 0.77f * 0.75f / ratio;
+    projection[0] *= k;
+    projection[4] *= k;
+    projection[8] *= k;
+    projection[12] *= k;
+}
+
+/* The 2D in SC2's 16:9 mode: the game lays its menus, screens and HUD out on the same 640x480 as in 4:3, which the
+   16:9 picture stretched by a third (as the Xbox's own on a 16:9 television). Screen-space draws (pretransformed, or
+   through an orthographic projection) on the 640x480 picture are drawn 3/4 as wide about its middle, so the 2D keeps
+   its shape, as a 4:3 picture in the middle of the 16:9 one; ones across the whole width (backgrounds, fades, screen
+   effects) still cover it, and points at the left or right edge stay there. True when the draw was narrowed. */
+static bool widescreen_2d(const RecompD3dVertexLayout *layout, RecompD3dPresenterDrawCommand *draw,
+                          const float viewport[6], uint8_t **packed)
+{
+    static int wide = -1;
+    if (wide < 0) {
+        const char *env = getenv("RECOMP_D3D_WIDESCREEN");
+        wide = env != NULL && env[0] != '\0' && strcmp(env, "0") != 0;
+    }
+    if (!wide || viewport[2] != 640.0f || viewport[3] < 448.0f || draw->vertex_count == 0u) return false;
+    const uint8_t *bytes = (const uint8_t *)draw->vertex_bytes;
+    const uint32_t stride = draw->vertex_stride, at = layout->position_offset;
+    float low = 1e30f, high = -1e30f;
+    for (uint32_t i = 0u; i < draw->vertex_count; ++i) {
+        float position[3];
+        memcpy(position, bytes + (size_t)i * stride + at, sizeof position);
+        float x = position[0];
+        if (!layout->pretransformed) {   /* to the viewport's pixels through the orthographic transform */
+            const float *t = draw->transform;
+            const float clip = position[0] * t[0] + position[1] * t[4] + position[2] * t[8] + t[12];
+            x = viewport[0] + (clip + 1.0f) * 0.5f * viewport[2];
+        }
+        if (x < low) low = x;
+        if (x > high) high = x;
+    }
+    const float left = viewport[0], right = viewport[0] + viewport[2], centre = left + viewport[2] * 0.5f;
+    if (low <= left + 1.0f && high >= right - 1.0f) return false;
+    const float *t = draw->transform;
+    /* (a band or panel out to an edge, a quarter of the width or more; a narrow piece there, a frame's pillar,
+       moves in whole) */
+    const bool at_edge = (low <= left + 1.0f || high >= right - 1.0f) && high - low >= viewport[2] * 0.25f;
+    if (!layout->pretransformed && (!at_edge || fabsf(t[0]) < 1e-12f || t[1] != 0.0f)) {
+        /* (the whole draw through its transform; one at an edge whose x is not the position's own, turned or
+           sheared, is left as it is) */
+        if (at_edge) return false;
+        draw->transform[0] *= 0.75f;
+        draw->transform[4] *= 0.75f;
+        draw->transform[8] *= 0.75f;
+        draw->transform[12] *= 0.75f;
+        return true;
+    }
+    if (*packed == NULL) {
+        *packed = malloc((size_t)stride * draw->vertex_count);
+        if (*packed == NULL) recomp_stop(2, "d3d8:draw-vertex-allocation");
+        memcpy(*packed, bytes, (size_t)stride * draw->vertex_count);
+        draw->vertex_bytes = *packed;
+    }
+    /* Each vertex moves 3/4 of the way to the middle, but in a band or panel out to an edge one at the picture's left
+       or right edge stays there: what the game builds out to an edge (the versus screen's name bars, the menus'
+       panels, in pieces) still reaches it, its inner end moving in with the rest, and the pieces still meet. */
+    for (uint32_t i = 0u; i < draw->vertex_count; ++i) {
+        uint8_t *v = *packed + (size_t)i * stride + at;
+        float position[3];
+        memcpy(position, v, sizeof position);
+        float x = position[0];
+        if (!layout->pretransformed)
+            x = left + ((position[0] * t[0] + position[1] * t[4] + position[2] * t[8] + t[12]) + 1.0f) * 0.5f * viewport[2];
+        if (at_edge && (x <= left + 1.0f || x >= right - 1.0f)) continue;
+        const float moved = centre + (x - centre) * 0.75f;
+        if (layout->pretransformed) position[0] = moved;
+        else position[0] += (moved - x) * 2.0f / viewport[2] / t[0];
+        memcpy(v, &position[0], sizeof position[0]);
+    }
+    return true;
+}
+
 static void multiply(const float left[16], const float right[16], float result[16], const char *site)
 {
     for (uint32_t row = 0u; row < 4u; ++row) {
@@ -2173,6 +2263,7 @@ static void submit_draw(uint32_t primitive, uint32_t count, uint32_t vertices,
     }
     draw->primitive_type = primitive;
     draw->triangle_count = triangles;
+    bool flat = false;   /* (an orthographic projection: 2D art drawn through SetModelView) */
     if (!layout.pretransformed && !program) {
         float view[16], projection[16], world[16], vp[16], blend[3][16];
         recomp_guest_load(view, device + 0x840u, sizeof view);
@@ -2198,6 +2289,7 @@ static void submit_draw(uint32_t primitive, uint32_t count, uint32_t vertices,
             free(packed);
             return;
         }
+        widescreen_projection(projection);
         multiply(view, projection, vp, "view-projection");
         if (model_view_active) {
             /* A model hides a part by scaling its joint to zero; the game's
@@ -2220,6 +2312,8 @@ static void submit_draw(uint32_t primitive, uint32_t count, uint32_t vertices,
         }
         else multiply(world, vp, draw->transform, "world");
         draw->has_transform = true;
+        flat = draw->transform[3] == 0.0f && draw->transform[7] == 0.0f && draw->transform[11] == 0.0f &&
+               draw->transform[15] != 0.0f;
         draw->blend_weight_count = layout.blend_weight_count;
         if (layout.blend_weight_count != 0u &&
             *recomp_memory_u32(0x0015e5b4u) != layout.blend_weight_count * 2u - 1u)
@@ -2259,6 +2353,13 @@ static void submit_draw(uint32_t primitive, uint32_t count, uint32_t vertices,
         const int32_t clip[4] = {(int32_t)viewport.x, (int32_t)viewport.y,
             (int32_t)(viewport.x + viewport.width), (int32_t)(viewport.y + viewport.height)};
         memcpy(draw->scissor, clip, sizeof clip);
+    }
+    if (!program && (layout.pretransformed || flat) && widescreen_2d(&layout, draw, rect, &packed) && scissors != 0u) {
+        const float centre = rect[0] + rect[2] * 0.5f;
+        if ((float)draw->scissor[0] > rect[0] + 1.0f)
+            draw->scissor[0] = (int32_t)floorf(centre + ((float)draw->scissor[0] - centre) * 0.75f);
+        if ((float)draw->scissor[2] < rect[0] + rect[2] - 1.0f)
+            draw->scissor[2] = (int32_t)ceilf(centre + ((float)draw->scissor[2] - centre) * 0.75f);
     }
     const RecompD3dRenderStateModel *state = recomp_d3d8_state_model();
     const bool native_line = primitive == 2u && !program && draw->fvf == 0x42u &&

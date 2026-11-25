@@ -2,10 +2,15 @@
 
 ## Unreleased
 
+- **Which gamepad is which player's**: the launcher's Controllers page gives each connected gamepad Automatic,
+  Player 1, Player 2 or Not used, and the game plays them so. A Steam Deck's own controls can be Not used, so two
+  gamepads plugged into it play each other. With nothing chosen the gamepads play in the order connected, as before
+  (recomp-common [#99](https://github.com/tmcleroy/recomp-common/pull/99)).
 - **Link and Heihachi on their own stage in Survival** ([#112](https://github.com/tmcleroy/soulcalibur2-recomp/issues/112)):
   Extra Survival's courses fight Spawn at battles 10 and 40, on his stage, where the GameCube's fight Link and the
   PlayStation 2's Heihachi. Those battles are now one of the three, one not met yet in the run first, on that stage.
-  Met as any other opponent, they fight on that battle's stage, as Spawn does.
+  As on the consoles, they are not drawn as Survival's other opponents, so the guests are met only in those
+  battles, in the Chapel ([#112](https://github.com/tmcleroy/soulcalibur2-recomp/issues/112)).
 - **Link and Heihachi on the Survival results** ([#112](https://github.com/tmcleroy/soulcalibur2-recomp/issues/112)):
   the results screen's beaten characters now show them when they were beaten.
 - **Link and Heihachi count in the results' wins**: a run's total of wins on the results screen (Survival's and the
@@ -15,6 +20,17 @@
   trimmed or re-packed image needs replacing with a full dump.
 - **Link and Heihachi in Extra Time Attack**: two of its courses fight Spawn at one battle, where the GameCube's
   fight Link and the PlayStation 2's Heihachi. That battle is now one of the three, as in Extra Survival.
+- **Building the guests says what is wrong with a disc**: a GameCube or PlayStation 2 disc image that is another
+  version, changed by a tool (trimmed, NKit, re-packed) or cut short now gets a message saying so, where it stopped
+  with "not a VGT bank" or "olnk entry cut short". On Android, a disc the system could not read whole is no longer
+  taken as copied.
+- **Widescreen in its right shape**: in the game's 16:9 mode the menus, screens and the fight's HUD were stretched by
+  a third, and the fights about 6% too wide. The 2D now keeps its 4:3 shape in the middle of the picture (backgrounds
+  and fades still fill it), and fights are shown at true 16:9.
+- **The GameCube's and PlayStation 2's title screens**: with the guests built from those discs, the title screen
+  shows the Xbox's, the GameCube's or the PS2's version of its picture at random, each with its own logo and
+  copyright lines. Which of the three pictures it is still follows your save, as on every console. The guests need
+  building again for it (the launcher asks).
 
 ## 0.6.0-beta.1
 

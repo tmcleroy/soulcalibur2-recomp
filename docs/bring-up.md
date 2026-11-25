@@ -280,8 +280,20 @@ ear, a person playing.
   is: a match at 3x renders at 1920x1440.
 - SC2 has its own 16:9 mode, chosen by the Xbox video setting's widescreen
   bit; `RECOMP_D3D_WIDESCREEN=1` sets it (shared kernel_config) and the
-  presenter shows 16:9. Menus, select screens, the HUD and matches lay
-  themselves out for it (1707x960 at 2x).
+  presenter shows 16:9 (1707x960 at 2x). The game lays its 2D out on the
+  same 640x480 either way, so shown 16:9 it was a third too wide (as the
+  Xbox's on a 16:9 television): screen-space draws (pretransformed, or
+  through an affine SetModelView composite) on the 640x448/480 picture are
+  drawn 3/4 as wide about its middle unless they span its whole width
+  (backgrounds, fades, effects): `widescreen_2d` in d3d8_draw_adapter.c.
+  In a band or panel built out to the left or right edge (a quarter of the
+  width or more: the versus screen's name bars, the menus' panels) the points
+  at the edge stay there, so it still reaches it and its pieces still meet;
+  narrower pieces there (the select frame's pillars) move in whole.
+  Its cameras narrow their horizontal scale from 0.77 of the vertical to
+  0.612 where 16:9 needs 0.5775 (0.77 x 3/4), so the 3D was 6% too wide
+  as well: `widescreen_projection` narrows perspective projections with
+  that ratio.
 
 Next: the launcher and in-game menu, then a training mode.
 

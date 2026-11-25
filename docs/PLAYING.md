@@ -16,7 +16,8 @@ The launcher is where the game is set up and started. Its pages:
 - **Textures**: an HD texture pack (below), imported from the folder you unzipped it to.
 - **Features**: the switches, in presets (*Original* plays exactly as the Xbox did; *Enhanced* turns on the
   improvements) or one by one.
-- **Controllers**: both players' keys and gamepad buttons.
+- **Controllers**: both players' keys and gamepad buttons, and which connected gamepad is which player's
+  (Automatic, a player, or Not used).
 
 ![The launcher's Game page](screenshots/launcher-game.png)
 
@@ -115,7 +116,7 @@ Practice mode's own options (the dummy's guard and actions, its attack data) are
 | No damage (each player), One-hit knockouts | Cheats, as in the menu |
 | Ping, Input delay, Hide names | What an online match shows |
 
-Widescreen (the game's own 16:9 mode: menus, fights and the HUD laid out wide), full screen and the free camera are
+Widescreen (the game's own 16:9 mode: fights shown wide, menus, screens and the HUD kept in their 4:3 shape in the middle), full screen and the free camera are
 on the launcher's Game page.
 
 ## Shaders

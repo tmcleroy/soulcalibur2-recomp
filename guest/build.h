@@ -7,6 +7,7 @@
 
 #include "discs.h"
 
+#include <cstdint>
 #include <functional>
 #include <string>
 
@@ -21,7 +22,8 @@ void build_guest_root(const DiscFile &xbox, const DiscFile &gamecube, const std:
 
 /* The game ID the GameCube disc must have (Soulcalibur II, USA). */
 constexpr const char *GAMECUBE_ID = "GRSEAF";
-/* The retail disc's version byte and root.olk size, named when a GameCube image fails to convert. */
+/* The retail disc's version byte and root.olk size: checked before building (root.olk), and named when a GameCube
+   image fails to convert. A disc with that ID and another root.olk is another version, or an image a tool changed. */
 constexpr int GAMECUBE_VERSION = 0;
 constexpr uint64_t GAMECUBE_ROOT_SIZE = 587427840u;
 
@@ -41,14 +43,19 @@ void build_guests_root(const DiscFile &xbox, const DiscFile *gamecube, const Dis
    noticed: the launcher asks for a rebuild, and online play compares it (two
    players need the same file). build_guests_root writes it beside the file, as
    <output>.version ("sc2-guests N"). */
-constexpr int GUESTS_VERSION = 5;
+constexpr int GUESTS_VERSION = 6;
 
 /* The version a guests' file was built with: 0 when it has no stamp (built
    before stamps, or a build that did not finish). */
 int guests_version(const std::string &output);
 
+/* The title screen's pictures, /2/12 on (the same on every disc): the guests' file has the GameCube's and the PS2's
+   after the disc's own /2 entries (TITLE_PICTURES each, the GameCube's first). */
+constexpr uint32_t TITLE_FIRST = 12, TITLE_PICTURES = 3;
+
 /* The PS2 disc's program (Soulcalibur II, USA). */
 constexpr const char *PS2_ID = "SLUS_206.43";
+constexpr uint64_t PS2_ROOT_SIZE = 705277952;
 
 } // namespace guest
 
