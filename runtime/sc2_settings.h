@@ -47,7 +47,9 @@ constexpr int XboxLanguage(int choice) { return choice == 1 ? 3 : choice == 2 ? 
 std::string ShaderPreset(int choice, const std::string &settings_path);
 
 /* Gives the runtime's host input the player's layout from settings.ini (the
-   usual one where it says nothing). The runner's alone (sc2_input.cpp). */
+   usual one where it says nothing) and which gamepad plays each port (its
+   [controllers]: the launcher's Controllers page). The runner's alone
+   (sc2_input.cpp). */
 void ApplyBindings(const std::string &path);
 
 } // namespace sc2

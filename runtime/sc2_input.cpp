@@ -1,13 +1,47 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 /* The player's key and button layout (sc2_settings.cpp's table, as
-   settings.ini chooses it) given to the runtime's host input. */
+   settings.ini chooses it) and which gamepad is which player's (the
+   launcher's Controllers page: [controllers]) given to the runtime's host
+   input. */
 #include "sc2_settings.h"
 
 #include "input_host_win32.h"
 
+#include <cstdio>
 #include <cstring>
 
 namespace sc2 {
+
+namespace {
+
+recomp::PadChoices &PadChoices()
+{
+    static recomp::PadChoices choices;
+    return choices;
+}
+
+/* (the host input's RecompInputHostAssign: called when a gamepad comes or
+   goes) Those chosen for a player play that player's port, the rest the
+   ports left in the order they were connected, so with nothing chosen each
+   gamepad plays the port of its seat, as before; one chosen as nobody's
+   plays nothing. */
+void AssignPads(SDL_Gamepad *const *seats, uint32_t count, SDL_Gamepad **ports)
+{
+    SDL_Gamepad *players[recomp::kBindMaxPlayers] = {};
+    const int seatCount = static_cast<int>(count);
+    const int portCount = static_cast<int>(RECOMP_INPUT_PORT_COUNT) < recomp::kBindMaxPlayers
+        ? static_cast<int>(RECOMP_INPUT_PORT_COUNT) : recomp::kBindMaxPlayers;
+    for (int seat = 0; seat < seatCount; ++seat) {
+        if (seats[seat] == nullptr) continue;
+        const std::string identity = recomp::PadIdentity(SDL_GetGamepadID(seats[seat]));
+        std::fprintf(stderr, "sc2 input: gamepad in seat %d is %s, chosen %s\n", seat, identity.c_str(),
+            recomp::PadChoiceText(PadChoices().of(identity)).c_str());
+    }
+    recomp::AssignPads(PadChoices(), seats, seatCount, portCount, players);
+    for (int port = 0; port < portCount; ++port) ports[port] = players[port];
+}
+
+} // namespace
 
 void ApplyBindings(const std::string &path)
 {
@@ -40,6 +74,8 @@ void ApplyBindings(const std::string &path)
         }
     }
     recomp_input_host_set_layout(&layout);
+    PadChoices() = recomp::LoadPadChoices(path);
+    recomp_input_host_set_assign(AssignPads);
 }
 
 } // namespace sc2
