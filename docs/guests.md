@@ -344,6 +344,8 @@ Still to do:
   table's second copy) lends a beaten guest the row of a character beaten 0
   times (`beaten_list`). The results screens reach 0xD29A0 through a jmp at 0xD2980, which the conversion makes a
   direct call, so that address is hooked as well.
+- The results screen's frame (0xD2C90, run as a task through the jmp at 0xD2990) adds the counts of those 24 rows for
+  its total of wins (0xD2FDF), so the guests' wins were left out; it lends them rows the same way (`results_frame`).
 - Survival's courses (0x52FE0 by the fight, [0x398B30]: rows of character, level, stage, health; -2 a drawn
   opponent) set Spawn (29) at fights 10 and 40 of the Extra courses, on stage 4, the guest slot's stage; the
   GameCube's have Link (27) there and the PS2's Heihachi (28), on the same stage. Each of those fights draws one of

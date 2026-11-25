@@ -13,6 +13,11 @@
   battles, in the Chapel ([#112](https://github.com/tmcleroy/soulcalibur2-recomp/issues/112)).
 - **Link and Heihachi on the Survival results** ([#112](https://github.com/tmcleroy/soulcalibur2-recomp/issues/112)):
   the results screen's beaten characters now show them when they were beaten.
+- **Link and Heihachi count in the results' wins**: a run's total of wins on the results screen (Survival's and the
+  others') left out the wins over Link and Heihachi, so 8 wins with one over Link showed 7.
+- **A clearer error when the guests can't be built from a GameCube image**: it now says what it found instead of a
+  texture bank and, when the image isn't the retail disc's (another version, or files of another size), says so: a
+  trimmed or re-packed image needs replacing with a full dump.
 - **Link and Heihachi in Extra Time Attack**: two of its courses fight Spawn at one battle, where the GameCube's
   fight Link and the PlayStation 2's Heihachi. That battle is now one of the three, as in Extra Survival.
 - **Building the guests says what is wrong with a disc**: a GameCube or PlayStation 2 disc image that is another

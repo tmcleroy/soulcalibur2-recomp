@@ -567,6 +567,17 @@ uint32_t entry_flags(const Bytes &vxt, uint32_t k)
 
 } // namespace
 
+/* A GameCube conversion's error, with how the image differs from the retail disc when it does: a trimmed, re-packed
+   or otherwise changed image passes the ID check but holds other data. */
+static std::string gamecube_failure(const DiscFile &gamecube, const std::string &what)
+{
+    if (gamecube.version == GAMECUBE_VERSION && gamecube.size == GAMECUBE_ROOT_SIZE) return "GameCube disc: " + what;
+    return "GameCube disc: " + what + ". This image is not the retail disc's (version " + std::to_string(gamecube.version) +
+           ", root.olk " + std::to_string(gamecube.size) + " bytes; the disc's: version " +
+           std::to_string(GAMECUBE_VERSION) + ", " + std::to_string(GAMECUBE_ROOT_SIZE) +
+           " bytes): use a full dump (.iso, or .ciso), not a trimmed or re-packed one";
+}
+
 /* The disc's root.olk against the USA release's: the guests are read from fixed places in it, and in another
    version's (or a changed image's) a texture bank or model is not where the builder looks ("not a VGT bank"). */
 static void check_root_size(const DiscFile &disc, const char *which, uint64_t want)
@@ -616,7 +627,7 @@ void build_guests_root(const DiscFile &xbox, const DiscFile *gamecube, const Dis
        PS2's (holes for a disc not given). The runtime shows one of the consoles' at random (sc2_guest.cpp, titles). */
     std::vector<Bytes> titles(2 * TITLE_PICTURES);
 
-    if (gamecube) {
+    if (gamecube) try {
         const Olnk groot(gamecube->read, 0), g4 = groot.child(4), g2 = groot.child(2);
         std::vector<Bytes> work(e4.begin(), e4.begin() + 982);
         link_block(x4, g4, work, step);
@@ -643,6 +654,8 @@ void build_guests_root(const DiscFile &xbox, const DiscFile *gamecube, const Dis
             titles.at(k) = keep_flags(paletted_bank({{entry_flags(x, 0), c8_texture(g2.bytes(TITLE_FIRST + k), 0)}}), x);
         }
         step();
+    } catch (const std::exception &e) {
+        throw Error(gamecube_failure(*gamecube, e.what()));
     }
     if (ps2) {
         const Olnk proot(ps2->read, 0), p4 = proot.child(4), p2 = proot.child(2);

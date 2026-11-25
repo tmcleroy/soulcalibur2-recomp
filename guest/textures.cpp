@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cstdio>
 #include <cstdlib>
 #include <map>
 #include <tuple>
@@ -350,9 +351,21 @@ void put_words(Bytes &b, size_t at, std::initializer_list<uint32_t> words)
 
 } // namespace
 
+/* "not a VGT bank", with what the entry holds instead (all zeros: an image with the file's data taken out). */
+[[noreturn]] static void not_vgt(const Bytes &b)
+{
+    if (b.empty()) throw Error("not a VGT bank (empty)");
+    if (std::all_of(b.begin(), b.end(), [](uint8_t c) { return c == 0; }))
+        throw Error("not a VGT bank (" + std::to_string(b.size()) + " bytes of zeros)");
+    char head[16];
+    std::snprintf(head, sizeof head, "%02x %02x %02x %02x", b[0], b.size() > 1 ? b[1] : 0, b.size() > 2 ? b[2] : 0,
+                  b.size() > 3 ? b[3] : 0);
+    throw Error(std::string("not a VGT bank (starts ") + head + ")");
+}
+
 Bytes convert_bank(const Bytes &vgt)
 {
-    if (!starts(vgt, "VGT.", 4)) throw Error("not a VGT bank");
+    if (!starts(vgt, "VGT.", 4)) not_vgt(vgt);
     const uint32_t count = be32(vgt, 8);
     const size_t table = 0x14 + 0x24 * size_t(count);
     const size_t data_at = align(table, 0x80);
@@ -481,7 +494,7 @@ Bytes paletted_bank(const std::vector<std::pair<uint32_t, Paletted>> &images, ui
 
 Bytes convert_paletted_bank(const Bytes &vgt, uint32_t size, long flags)
 {
-    if (!starts(vgt, "VGT.", 4)) throw Error("not a VGT bank");
+    if (!starts(vgt, "VGT.", 4)) not_vgt(vgt);
     const uint32_t count = be32(vgt, 8);
     std::vector<std::pair<uint32_t, Paletted>> images;
     for (uint32_t k = 0; k < count; ++k) {
@@ -532,7 +545,7 @@ Bytes rgba8_bank(const std::vector<Rgba8Image> &images)
 
 Bytes convert_rgba8_bank(const Bytes &vgt, long flags)
 {
-    if (!starts(vgt, "VGT.", 4)) throw Error("not a VGT bank");
+    if (!starts(vgt, "VGT.", 4)) not_vgt(vgt);
     const uint32_t count = be32(vgt, 8);
     std::vector<Rgba8Image> images;
     for (uint32_t k = 0; k < count; ++k) {
