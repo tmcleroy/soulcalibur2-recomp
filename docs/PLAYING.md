@@ -16,7 +16,8 @@ The launcher is where the game is set up and started. Its pages:
 - **Textures**: an HD texture pack (below), imported from the folder you unzipped it to.
 - **Features**: the switches, in presets (*Original* plays exactly as the Xbox did; *Enhanced* turns on the
   improvements) or one by one.
-- **Controllers**: both players' keys and gamepad buttons.
+- **Controllers**: both players' keys and gamepad buttons, and which connected gamepad is which player's
+  (Automatic, a player, or Not used).
 
 ![The launcher's Game page](screenshots/launcher-game.png)
 
