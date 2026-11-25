@@ -558,3 +558,16 @@ of /2/5, after the select screens' small icons. The game loads /2/5 into the fir
 contents and effect 27's picture was noise for every character. With the guests the European program's first region
 is 0x8000 longer and the next ("COMMON MOTION", 0x49000 to spare) starts that much later (`sc2_hooks.c`,
 `data_region`). The guests' file is unchanged.
+
+## The title screens
+
+The title screen (scene 5) shows one of three pictures, `/2/12`-`14` on every disc, chosen by the save's
+progress (a new save shows the first, the blue one; the weapons are the third). Each console has its own three:
+the same pictures with its own logo (the Xbox's red and gold, the GameCube's green, the PS2's blue) and copyright
+lines. The guests' file has the GameCube's (C8, `c8_texture`) and the PS2's (`Ps2Bank`) after the disc's `/2`
+entries (US 516-521, Europe 585-590: GameCube 12-14, then PS2 12-14; holes for a disc not given), each made the
+Xbox's 512 x 512 P8 bank, the same size as its own. As the game reads its picture, the runtime's read-source hook
+(`recomp_kernel_read_source_hook`, kernel_file.c) gives one of the consoles' offsets at random (`TitleSource`,
+sc2_guest.cpp). The game's choice of picture stays the game's. (Built by guest/build.cpp only; roster.py has not
+had it added.)
+

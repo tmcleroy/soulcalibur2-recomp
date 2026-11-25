@@ -32,9 +32,12 @@ extern "C" {
 #include <algorithm>
 #include <cstdio>
 #include <cstring>
+#include <random>
+#include <string>
 #include <vector>
 
 extern "C" uint32_t recomp_kernel_allocate_pool(uint32_t size);
+extern "C" uint64_t (*recomp_kernel_read_source_hook)(const char *host_path, uint64_t offset, uint32_t length);
 
 namespace sc2 {
 
@@ -295,11 +298,69 @@ bool GuestFileMatches(const char *path)
     uint32_t size, count = 0;
     const bool read = Entry(f, 0, 2, ui, size) && std::fseek(f, long(ui), SEEK_SET) == 0 && std::fread(&count, 4, 1, f) == 1;
     std::fclose(f);
-    if (read && count == kUiEntries) return true;
+    /* (the disc's /2 entries, then, in a file built since, the GameCube's and the PS2's title pictures: SetUpTitles) */
+    if (read && (count == kUiEntries || count == kUiEntries + 6u)) return true;
     std::fprintf(stderr, "recomp sc2: the guests' file %s was built from %s, not this one: playing without the guests\n",
-                 path, !read ? "something else than a disc" : count == 585u ? "the European disc" : count == 516u ? "the US disc"
-                                                                       : "another disc");
+                 path, !read ? "something else than a disc" : count == 585u || count == 591u ? "the European disc"
+                                                          : count == 516u || count == 522u ? "the US disc" : "another disc");
     return false;
+}
+
+/* The title screen (scene 5) shows one of three pictures, /2/12-14, by the save's progress (a new save the first).
+   The guests' file has the GameCube's and the PS2's three after the disc's /2 entries (guest/build.cpp, titles), the
+   same size as the Xbox's: as the game reads one of its own, the read takes one of the consoles' at random, from
+   those the file has (the Xbox's own among them). */
+struct Title {
+    uint64_t at = 0;
+    uint32_t size = 0;
+    uint64_t others[2] = {};
+    const char *names[2] = {};
+    uint32_t other_count = 0;
+};
+Title g_titles[3];
+std::string g_titles_path;
+
+uint64_t TitleSource(const char *host_path, uint64_t offset, uint32_t length)
+{
+    if (host_path == nullptr) return offset;
+    const size_t path_length = std::strlen(host_path);   /* (the guests' file, by its name: the path may be written another way) */
+    if (path_length < g_titles_path.size() || std::strcmp(host_path + path_length - g_titles_path.size(), g_titles_path.c_str()) != 0)
+        return offset;
+    for (const Title &t : g_titles) {
+        if (t.other_count == 0u || offset != t.at || length < t.size) continue;
+        static std::mt19937 random{std::random_device{}()};
+        const uint32_t pick = uint32_t(random() % (t.other_count + 1u));
+        std::fprintf(stderr, "recomp sc2: the title screen's picture %u, the %s's\n", uint32_t(&t - g_titles),
+                     pick == 0u ? "Xbox" : t.names[pick - 1u]);
+        return pick == 0u ? offset : t.others[pick - 1u];
+    }
+    return offset;
+}
+
+void SetUpTitles(std::FILE *f, uint64_t ui, const char *path)
+{
+    constexpr uint32_t kTitleFirst = 12u, kTitlePictures = 3u;   /* (guest/build.h, TITLE_FIRST, TITLE_PICTURES) */
+    uint32_t count = 0;
+    if (std::fseek(f, long(ui), SEEK_SET) || std::fread(&count, 4, 1, f) != 1 || count < kUiEntries + 2u * kTitlePictures)
+        return;   /* (a guests' file built before these) */
+    for (uint32_t k = 0; k < kTitlePictures; ++k) {
+        Title &t = g_titles[k];
+        if (!Entry(f, ui, Ui(kTitleFirst + k), t.at, t.size) || t.size == 0u) continue;
+        for (uint32_t console = 0; console < 2u; ++console) {
+            uint64_t at;
+            uint32_t size;
+            if (Entry(f, ui, kUiEntries + console * kTitlePictures + k, at, size) && size == t.size) {
+                t.names[t.other_count] = console == 0u ? "GameCube" : "PlayStation 2";
+                t.others[t.other_count++] = at;
+            }
+        }
+    }
+    const char *name = std::strrchr(path, '/');
+#ifdef _WIN32
+    if (const char *back = std::strrchr(path, '\\'); back != nullptr && (name == nullptr || back > name)) name = back;
+#endif
+    g_titles_path = name != nullptr ? name : path;
+    recomp_kernel_read_source_hook = TitleSource;
 }
 
 bool ApplyGuestRoster(const char *path)
@@ -349,6 +410,7 @@ bool ApplyGuestRoster(const char *path)
             std::memcmp(profiles[g].data(), "GPRF", 4) != 0)
             ok = false;
     }
+    if (ok && have_ui) SetUpTitles(f, ui, path);
     std::fclose(f);
     if (!ok) return false;
 

@@ -611,6 +611,10 @@ void build_guests_root(const DiscFile &xbox, const DiscFile *gamecube, const Dis
     const uint32_t hires_entry = layout.ui(395), illus_entry = layout.ui(396), special_entry = layout.ui(397);
     const Bytes hires = x2.bytes(hires_entry), illus = x2.bytes(illus_entry), special = x2.bytes(special_entry);
     std::vector<std::pair<uint32_t, Paletted>> hires_new, illus_new, special_new;
+    /* The title screen's three pictures (/2/12-14, the game choosing by the save's progress) as the GameCube's and
+       the PS2's own (their logos and copyright lines), after the disc's /2 entries: the GameCube's three, then the
+       PS2's (holes for a disc not given). The runtime shows one of the consoles' at random (sc2_guest.cpp, titles). */
+    std::vector<Bytes> titles(2 * TITLE_PICTURES);
 
     if (gamecube) {
         const Olnk groot(gamecube->read, 0), g4 = groot.child(4), g2 = groot.child(2);
@@ -634,6 +638,10 @@ void build_guests_root(const DiscFile &xbox, const DiscFile *gamecube, const Dis
         hires_new.emplace_back(entry_flags(hires, 20), c8_texture(g395, 20));
         for (uint32_t k : {20u, 35u, 41u}) illus_new.emplace_back(entry_flags(illus, k), c8_texture(g396, k));
         for (uint32_t k : {5u, 7u}) special_new.emplace_back(entry_flags(special, k), c8_texture(g397, k));
+        for (uint32_t k = 0; k < TITLE_PICTURES; ++k) {
+            const Bytes x = x2.bytes(layout.ui(TITLE_FIRST + k));
+            titles.at(k) = keep_flags(paletted_bank({{entry_flags(x, 0), c8_texture(g2.bytes(TITLE_FIRST + k), 0)}}), x);
+        }
         step();
     }
     if (ps2) {
@@ -662,6 +670,11 @@ void build_guests_root(const DiscFile &xbox, const DiscFile *gamecube, const Dis
         hires_new.emplace_back(entry_flags(hires, 20), p395.texture(20).paletted());
         for (uint32_t k : {20u, 35u}) illus_new.emplace_back(entry_flags(illus, k), p396.texture(k).paletted());
         for (uint32_t k : {5u, 7u}) special_new.emplace_back(entry_flags(special, k), p397.texture(k).paletted());
+        for (uint32_t k = 0; k < TITLE_PICTURES; ++k) {
+            const Bytes x = x2.bytes(layout.ui(TITLE_FIRST + k)), title = p2.bytes(TITLE_FIRST + k);
+            Ps2Bank bank(title);
+            titles.at(TITLE_PICTURES + k) = keep_flags(paletted_bank({{entry_flags(x, 0), bank.texture(0).paletted()}}), x);
+        }
         step();
     }
     if (!hires_new.empty()) e2.at(hires_entry) = append_p8(hires, hires_new);
@@ -673,6 +686,10 @@ void build_guests_root(const DiscFile &xbox, const DiscFile *gamecube, const Dis
     large10.at(0) = append_p8(large10.at(0), large10_new);
     e2.at(10) = build_pack(large10, pack_alignment(x2.bytes(10)));
     top.at(4) = build_olnk(e4, t4, x4.alignment(), x4.time());
+    for (Bytes &title : titles) {
+        e2.push_back(std::move(title));
+        t2.push_back(t2.at(layout.ui(TITLE_FIRST)));
+    }
     top.at(2) = build_olnk(e2, t2, x2.alignment(), x2.time());
     step();
     const std::string stamp = output + ".version";

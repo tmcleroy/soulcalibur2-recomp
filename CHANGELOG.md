@@ -18,6 +18,10 @@
 - **Widescreen in its right shape**: in the game's 16:9 mode the menus, screens and the fight's HUD were stretched by
   a third, and the fights about 6% too wide. The 2D now keeps its 4:3 shape in the middle of the picture (backgrounds
   and fades still fill it), and fights are shown at true 16:9.
+- **The GameCube's and PlayStation 2's title screens**: with the guests built from those discs, the title screen
+  shows the Xbox's, the GameCube's or the PS2's version of its picture at random, each with its own logo and
+  copyright lines. Which of the three pictures it is still follows your save, as on every console. The guests need
+  building again for it (the launcher asks).
 
 ## 0.6.0-beta.1
 
