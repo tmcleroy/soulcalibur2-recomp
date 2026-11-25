@@ -236,6 +236,7 @@ DiscFile open_gamecube_root(const std::string &path)
     if (disc.size() < 0x440 || be32(disc, 0x1c) != 0xc2339f3d) throw Error("not a GameCube disc image: " + path);
     DiscFile out;
     out.game_id.assign(disc.begin(), disc.begin() + 6);
+    out.version = disc[7];
     const uint32_t fst_at = be32(disc, 0x424), fst_size = be32(disc, 0x428);
     const Bytes fst = image.read(fst_at, fst_size);
     if (fst.size() < 12) throw Error("GameCube FST missing");

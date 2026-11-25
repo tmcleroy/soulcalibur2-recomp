@@ -36,6 +36,7 @@ extern void sub_00036A40(void);
 extern void sub_000F1390(void);
 extern void sub_000D24F0(void);
 extern void sub_000D29A0(void);
+extern void sub_000D2C90(void);
 extern void sub_000569F0(void);
 extern void sub_000DCFA0(void);
 extern void sub_000DD5B0(void);
@@ -567,32 +568,59 @@ static void result_name(void)
     memcpy(recomp_memory(0x34A9E0u + 14u * 0x22u, 0x22u), kept, sizeof kept);
 }
 
-/* 0xD29A0: a result screen's characters beaten in the run, those whose count (0x398B8C, a word by ID, raised as
-   each falls) is 1 or more, in the order of the name table's second copy (0x34AD10, 24 rows of 0x22 bytes). The
-   guests have counts but no rows: each beaten guest takes, while it runs, the row of a character beaten 0 times
-   (shown by nobody), the table given back after. The results screens reach it through 0xD2980, a jmp to it, which the
-   conversion makes a direct call: that address is hooked too (as the same function), or the guests were never shown. */
-static void beaten_list(void)
+/* The result screens read the characters beaten in a run (counts by ID at 0x398B8C, a word each, raised as each
+   falls) through the rows of the name table's second copy (0x34AD10, 24 rows of 0x22 bytes, an ID byte first). The
+   guests have counts but no rows: while such a routine runs, each beaten guest takes the row of a character beaten
+   0 times (shown by nobody, adding nothing), the table given back after. */
+typedef struct BeatenRows {
+    uint32_t lent[2];
+    uint8_t kept[2];
+    unsigned count;
+} BeatenRows;
+
+static BeatenRows lend_beaten_rows(void)
 {
     enum { ROWS = 0x34AD10u, ROW = 0x22u, COUNTS = 0x398B8Cu };
-    uint32_t lent[2] = {0u, 0u};
-    uint8_t kept[2] = {0u, 0u};
-    unsigned lending = 0;
+    BeatenRows rows = {{0u, 0u}, {0u, 0u}, 0u};
     for (uint32_t guest = 27u; guest <= 28u; ++guest) {
         if (!sc2_guest_loaded(guest) || *(uint16_t *)(void *)recomp_memory(COUNTS + guest * 2u, 2u) == 0u) continue;
         for (int row = 23; row >= 0; --row) {
             const uint32_t at = ROWS + (uint32_t)row * ROW;
             const uint8_t id = *recomp_memory(at, 1u);
             if (id == 27u || id == 28u || *(uint16_t *)(void *)recomp_memory(COUNTS + id * 2u, 2u) != 0u) continue;
-            lent[lending] = at;
-            kept[lending] = id;
+            rows.lent[rows.count] = at;
+            rows.kept[rows.count] = id;
             *recomp_memory(at, 1u) = (uint8_t)guest;
-            ++lending;
+            ++rows.count;
             break;
         }
     }
+    return rows;
+}
+
+static void give_back_beaten_rows(const BeatenRows *rows)
+{
+    for (unsigned i = 0; i < rows->count; ++i) *recomp_memory(rows->lent[i], 1u) = rows->kept[i];
+}
+
+/* 0xD29A0: a result screen's list of the characters beaten in the run, those with a count of 1 or more, in the
+   table's order. The results screens reach it through 0xD2980, a jmp to it, which the conversion makes a direct
+   call: that address is hooked too (as the same function), or the guests were never shown. */
+static void beaten_list(void)
+{
+    const BeatenRows rows = lend_beaten_rows();
     sub_000D29A0();
-    for (unsigned i = 0; i < lending; ++i) *recomp_memory(lent[i], 1u) = kept[i];
+    give_back_beaten_rows(&rows);
+}
+
+/* 0xD2C90: a result screen's frame (Survival's and the others'), run as a task through the jmp at 0xD2990. Its total
+   of wins (0xD2FDF) adds the counts of the table's 24 rows, so a beaten guest's wins were left out of it (8 wins,
+   one of them over Link, showed 7). */
+static void results_frame(void)
+{
+    const BeatenRows rows = lend_beaten_rows();
+    sub_000D2C90();
+    give_back_beaten_rows(&rows);
 }
 
 /* 0xDCFA0(gallery object, gallery): sets the Art Gallery's grid, columns at +0x7e and rows at +0x7d (Hi-Res 5 x 4,
@@ -814,6 +842,8 @@ RecompFunction recomp_sc2_hooks_lookup_manual(uint32_t address)
     case 0x000d24f0u: return result_name;
     case 0x000d29a0u: return beaten_list;
     case 0x000d2980u: return beaten_list;
+    case 0x000d2c90u: return results_frame;
+    case 0x000d2990u: return results_frame;
     case 0x000569f0u: return character_item;
     case 0x00056a00u: return character_ending;
     case 0x00055010u: return second_fighter;

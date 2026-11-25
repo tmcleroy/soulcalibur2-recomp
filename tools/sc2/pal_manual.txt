@@ -15,6 +15,8 @@
 0x000d24f0 0x000d5cc0   # 3 callers agree
 0x000d29a0 0x000d6180   # identical shape (ratio 1.0), 0x37e0 after it as 0xd24f0 is
 0x000d2980 0x000d6160   # the jmp to 0xd29a0 just before it (PAL: jmp 0xd6180 at 0xd6160)
+0x000d2c90 0x000d6470   # the results frame: the jmp 0xd2990 to it is pushed as a task at 0x38946, PAL jmp 0xd6470 at
+0x000d2990 0x000d6170   # 0xd6170 pushed at 0x39326 (0x37e0 after, as 0xd29a0 is)
 0x000f1310 0x000f5770   # 3 callers agree, identical shape
 0x000f1c70 0x000f60d0   # 3 callers agree (the shape pass picked its twin 0xf60a0)
 0x000f26e0 0x000f6b40   # 4 callers agree

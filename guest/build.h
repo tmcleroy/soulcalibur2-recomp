@@ -21,6 +21,9 @@ void build_guest_root(const DiscFile &xbox, const DiscFile &gamecube, const std:
 
 /* The game ID the GameCube disc must have (Soulcalibur II, USA). */
 constexpr const char *GAMECUBE_ID = "GRSEAF";
+/* The retail disc's version byte and root.olk size, named when a GameCube image fails to convert. */
+constexpr int GAMECUBE_VERSION = 0;
+constexpr uint64_t GAMECUBE_ROOT_SIZE = 587427840u;
 
 /* The same with Heihachi, from the player's PlayStation 2 disc (the port of
    build_guest.py's build_heihachi). */

@@ -567,6 +567,17 @@ uint32_t entry_flags(const Bytes &vxt, uint32_t k)
 
 } // namespace
 
+/* A GameCube conversion's error, with how the image differs from the retail disc when it does: a trimmed, re-packed
+   or otherwise changed image passes the ID check but holds other data. */
+static std::string gamecube_failure(const DiscFile &gamecube, const std::string &what)
+{
+    if (gamecube.version == GAMECUBE_VERSION && gamecube.size == GAMECUBE_ROOT_SIZE) return "GameCube disc: " + what;
+    return "GameCube disc: " + what + ". This image is not the retail disc's (version " + std::to_string(gamecube.version) +
+           ", root.olk " + std::to_string(gamecube.size) + " bytes; the disc's: version " +
+           std::to_string(GAMECUBE_VERSION) + ", " + std::to_string(GAMECUBE_ROOT_SIZE) +
+           " bytes): use a full dump (.iso, or .ciso), not a trimmed or re-packed one";
+}
+
 void build_guests_root(const DiscFile &xbox, const DiscFile *gamecube, const DiscFile *ps2, const std::string &output,
                        const Progress &progress)
 {
@@ -599,7 +610,7 @@ void build_guests_root(const DiscFile &xbox, const DiscFile *gamecube, const Dis
     const Bytes hires = x2.bytes(hires_entry), illus = x2.bytes(illus_entry), special = x2.bytes(special_entry);
     std::vector<std::pair<uint32_t, Paletted>> hires_new, illus_new, special_new;
 
-    if (gamecube) {
+    if (gamecube) try {
         const Olnk groot(gamecube->read, 0), g4 = groot.child(4), g2 = groot.child(2);
         std::vector<Bytes> work(e4.begin(), e4.begin() + 982);
         link_block(x4, g4, work, step);
@@ -622,6 +633,8 @@ void build_guests_root(const DiscFile &xbox, const DiscFile *gamecube, const Dis
         for (uint32_t k : {20u, 35u, 41u}) illus_new.emplace_back(entry_flags(illus, k), c8_texture(g396, k));
         for (uint32_t k : {5u, 7u}) special_new.emplace_back(entry_flags(special, k), c8_texture(g397, k));
         step();
+    } catch (const std::exception &e) {
+        throw Error(gamecube_failure(*gamecube, e.what()));
     }
     if (ps2) {
         const Olnk proot(ps2->read, 0), p4 = proot.child(4), p2 = proot.child(2);
