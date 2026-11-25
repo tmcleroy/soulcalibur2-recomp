@@ -196,7 +196,7 @@ static void widescreen_projection(float projection[16])
    16:9 picture stretched by a third (as the Xbox's own on a 16:9 television). Screen-space draws (pretransformed, or
    through an orthographic projection) on the 640x480 picture are drawn 3/4 as wide about its middle, so the 2D keeps
    its shape, as a 4:3 picture in the middle of the 16:9 one; ones across the whole width (backgrounds, fades, screen
-   effects) still cover it. True when the draw was narrowed. */
+   effects) still cover it, and points at the left or right edge stay there. True when the draw was narrowed. */
 static bool widescreen_2d(const RecompD3dVertexLayout *layout, RecompD3dPresenterDrawCommand *draw,
                           const float viewport[6], uint8_t **packed)
 {
@@ -221,8 +221,16 @@ static bool widescreen_2d(const RecompD3dVertexLayout *layout, RecompD3dPresente
         if (x < low) low = x;
         if (x > high) high = x;
     }
-    if (low <= viewport[0] + 1.0f && high >= viewport[0] + viewport[2] - 1.0f) return false;
-    if (!layout->pretransformed) {
+    const float left = viewport[0], right = viewport[0] + viewport[2], centre = left + viewport[2] * 0.5f;
+    if (low <= left + 1.0f && high >= right - 1.0f) return false;
+    const float *t = draw->transform;
+    /* (a band or panel out to an edge, a quarter of the width or more; a narrow piece there, a frame's pillar,
+       moves in whole) */
+    const bool at_edge = (low <= left + 1.0f || high >= right - 1.0f) && high - low >= viewport[2] * 0.25f;
+    if (!layout->pretransformed && (!at_edge || fabsf(t[0]) < 1e-12f || t[1] != 0.0f)) {
+        /* (the whole draw through its transform; one at an edge whose x is not the position's own, turned or
+           sheared, is left as it is) */
+        if (at_edge) return false;
         draw->transform[0] *= 0.75f;
         draw->transform[4] *= 0.75f;
         draw->transform[8] *= 0.75f;
@@ -235,13 +243,21 @@ static bool widescreen_2d(const RecompD3dVertexLayout *layout, RecompD3dPresente
         memcpy(*packed, bytes, (size_t)stride * draw->vertex_count);
         draw->vertex_bytes = *packed;
     }
-    const float centre = viewport[0] + viewport[2] * 0.5f;
+    /* Each vertex moves 3/4 of the way to the middle, but in a band or panel out to an edge one at the picture's left
+       or right edge stays there: what the game builds out to an edge (the versus screen's name bars, the menus'
+       panels, in pieces) still reaches it, its inner end moving in with the rest, and the pieces still meet. */
     for (uint32_t i = 0u; i < draw->vertex_count; ++i) {
         uint8_t *v = *packed + (size_t)i * stride + at;
-        float x;
-        memcpy(&x, v, sizeof x);
-        x = centre + (x - centre) * 0.75f;
-        memcpy(v, &x, sizeof x);
+        float position[3];
+        memcpy(position, v, sizeof position);
+        float x = position[0];
+        if (!layout->pretransformed)
+            x = left + ((position[0] * t[0] + position[1] * t[4] + position[2] * t[8] + t[12]) + 1.0f) * 0.5f * viewport[2];
+        if (at_edge && (x <= left + 1.0f || x >= right - 1.0f)) continue;
+        const float moved = centre + (x - centre) * 0.75f;
+        if (layout->pretransformed) position[0] = moved;
+        else position[0] += (moved - x) * 2.0f / viewport[2] / t[0];
+        memcpy(v, &position[0], sizeof position[0]);
     }
     return true;
 }
@@ -2340,8 +2356,10 @@ static void submit_draw(uint32_t primitive, uint32_t count, uint32_t vertices,
     }
     if (!program && (layout.pretransformed || flat) && widescreen_2d(&layout, draw, rect, &packed) && scissors != 0u) {
         const float centre = rect[0] + rect[2] * 0.5f;
-        draw->scissor[0] = (int32_t)floorf(centre + ((float)draw->scissor[0] - centre) * 0.75f);
-        draw->scissor[2] = (int32_t)ceilf(centre + ((float)draw->scissor[2] - centre) * 0.75f);
+        if ((float)draw->scissor[0] > rect[0] + 1.0f)
+            draw->scissor[0] = (int32_t)floorf(centre + ((float)draw->scissor[0] - centre) * 0.75f);
+        if ((float)draw->scissor[2] < rect[0] + rect[2] - 1.0f)
+            draw->scissor[2] = (int32_t)ceilf(centre + ((float)draw->scissor[2] - centre) * 0.75f);
     }
     const RecompD3dRenderStateModel *state = recomp_d3d8_state_model();
     const bool native_line = primitive == 2u && !program && draw->fvf == 0x42u &&
