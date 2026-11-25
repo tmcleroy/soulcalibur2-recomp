@@ -348,9 +348,13 @@ Still to do:
   opponent) set Spawn (29) at fights 10 and 40 of the Extra courses, on stage 4, the guest slot's stage; the
   GameCube's have Link (27) there and the PS2's Heihachi (28), on the same stage. Each of those fights draws one of
   the three (`next_opponent`, the hook on the opponent choice 0x56250), one not yet met in the run first.
+  Those are the only Survival fights with a guest: the drawn opponents (0x523A0 by mode) leave out the guest slot,
+  Necrid, Inferno and the bonus fighters, and the PS2's leave out Heihachi the same way. The Xbox's let 27 and 28
+  through (never available there), so `survival_draw_allowed` leaves them out. On every disc stage 4 is the Chapel
+  and 6, Necrid's fights', the Egyptian Crypt.
 - Practice's Command List and Show Move work for both (their move names and
   inputs from their own discs), and both come up as the computer's opponents in
-  Survival, in either outfit, Link's bombs and all.
+  Extra Survival's guest battles, in either outfit, Link's bombs and all.
 - Weapon Master's select (scene 26; 0xFA030 builds, 0xFA430 runs a frame) is
   a 5 x 4 grid of the table at 0x36C490 (character ID, outfit), its sprites in a
   pool of 64 slots sized for 20 cells. The guests stand in a sixth column beside

@@ -5,7 +5,8 @@
 - **Link and Heihachi on their own stage in Survival** ([#112](https://github.com/tmcleroy/soulcalibur2-recomp/issues/112)):
   Extra Survival's courses fight Spawn at battles 10 and 40, on his stage, where the GameCube's fight Link and the
   PlayStation 2's Heihachi. Those battles are now one of the three, one not met yet in the run first, on that stage.
-  Met as any other opponent, they fight on that battle's stage, as Spawn does.
+  As on the consoles, they are not drawn as Survival's other opponents, so the guests are met only in those
+  battles, in the Chapel ([#112](https://github.com/tmcleroy/soulcalibur2-recomp/issues/112)).
 - **Link and Heihachi on the Survival results** ([#112](https://github.com/tmcleroy/soulcalibur2-recomp/issues/112)):
   the results screen's beaten characters now show them when they were beaten.
 - **Link and Heihachi in Extra Time Attack**: two of its courses fight Spawn at one battle, where the GameCube's
