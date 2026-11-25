@@ -43,7 +43,27 @@ struct File {
         out.resize(std::fread(out.data(), 1, size, f));
         return out;
     }
+    uint64_t length()
+    {
+        std::lock_guard<std::mutex> guard(lock);
+#ifdef _WIN32
+        _fseeki64(f, 0, SEEK_END);
+        return uint64_t(_ftelli64(f));
+#else
+        fseeko(f, 0, SEEK_END);
+        return uint64_t(ftello(f));
+#endif
+    }
 };
+
+/* A disc image shorter than its own directory says (a download or copy that stopped early): its files' data,
+   read past the end, came back short, and the builder found nothing it knew where a texture bank or model was. */
+[[noreturn]] void cut_short(const char *disc, uint64_t have, uint64_t need)
+{
+    auto mb = [](uint64_t n) { return std::to_string((n + (1u << 20) - 1) >> 20); };
+    throw Error(std::string("the ") + disc + " disc image is cut short: it is " + mb(have) + " MB, and its files need " +
+                mb(need) + " MB. Copy or download it again, whole");
+}
 
 /* The GameCube disc as a flat image, through a CISO's block map when there is one. */
 struct GcImage {
@@ -53,7 +73,11 @@ struct GcImage {
 
     Bytes read(uint64_t offset, size_t size) const
     {
-        if (!block) return file->read(offset, size);
+        if (!block) {
+            Bytes out = file->read(offset, size);
+            if (out.size() != size) throw Error("GameCube disc image cut short");
+            return out;
+        }
         Bytes out;
         while (size) {
             const uint64_t b = offset / block, within = offset % block;
@@ -193,6 +217,8 @@ DiscFile open_ps2_root(const std::string &path)
         out.program = []() -> Bytes { throw Error("the PlayStation 2 disc's program is missing"); };
     }
     out.size = olk_size;
+    const uint64_t have = file->length();
+    if (have < olk + olk_size) cut_short("PlayStation 2", have, olk + olk_size);
     out.read = [file, olk](uint64_t o, size_t n) { return file->read(olk + o, n); };
     return out;
 }
@@ -232,7 +258,7 @@ DiscFile open_gamecube_root(const std::string &path)
         int64_t n = 0;
         for (size_t i = 8; i < 0x8000; ++i) image.blocks.push_back(head[i] ? n++ : -1);
     }
-    const Bytes disc = image.read(0, 0x440);
+    const Bytes disc = image.block ? image.read(0, 0x440) : image.file->read(0, 0x440);
     if (disc.size() < 0x440 || be32(disc, 0x1c) != 0xc2339f3d) throw Error("not a GameCube disc image: " + path);
     DiscFile out;
     out.game_id.assign(disc.begin(), disc.begin() + 6);
@@ -256,6 +282,21 @@ DiscFile open_gamecube_root(const std::string &path)
             };
             const uint64_t base = be32(fst, e + 4);
             out.size = be32(fst, e + 8);
+            if (!image.block) {
+                const uint64_t have = image.file->length();
+                if (have < base + out.size) cut_short("GameCube", have, base + out.size);
+            } else {
+                int64_t stored = 0;
+                for (int64_t b : image.blocks) stored += b >= 0;
+                const uint64_t have = image.file->length(), need = 0x8000 + uint64_t(stored) * image.block;
+                /* (the last stored block may be cut at the disc's end, as long as it holds what the files need) */
+                const uint64_t last = (base + out.size - 1) / image.block;
+                if (last < image.blocks.size() && image.blocks[last] >= 0) {
+                    const uint64_t end = 0x8000 + uint64_t(image.blocks[last]) * image.block +
+                                         (base + out.size - 1) % image.block + 1;
+                    if (have < end) cut_short("GameCube", have, need);
+                }
+            }
             out.read = [image, base](uint64_t o, size_t n) { return image.read(base + o, n); };
             return out;
         }

@@ -567,6 +567,17 @@ uint32_t entry_flags(const Bytes &vxt, uint32_t k)
 
 } // namespace
 
+/* The disc's root.olk against the USA release's: the guests are read from fixed places in it, and in another
+   version's (or a changed image's) a texture bank or model is not where the builder looks ("not a VGT bank"). */
+static void check_root_size(const DiscFile &disc, const char *which, uint64_t want)
+{
+    if (disc.size != want)
+        throw Error(std::string("the ") + which + " disc's root.olk is " + std::to_string(disc.size) +
+                    " bytes, where Soulcalibur II (USA)'s is " + std::to_string(want) +
+                    ": another version of the disc, or an image a tool changed (trimmed, NKit, re-packed). "
+                    "A full dump of the USA disc will do");
+}
+
 void build_guests_root(const DiscFile &xbox, const DiscFile *gamecube, const DiscFile *ps2, const std::string &output,
                        const Progress &progress)
 {
@@ -574,6 +585,8 @@ void build_guests_root(const DiscFile &xbox, const DiscFile *gamecube, const Dis
         throw Error("the GameCube disc is " + gamecube->game_id + ", not Soulcalibur II (USA, " + GAMECUBE_ID + ")");
     if (ps2 && !ps2->game_id.empty() && ps2->game_id != PS2_ID)
         throw Error("the PlayStation 2 disc is " + ps2->game_id + ", not Soulcalibur II (USA, " + PS2_ID + ")");
+    if (gamecube) check_root_size(*gamecube, "GameCube", GAMECUBE_ROOT_SIZE);
+    if (ps2) check_root_size(*ps2, "PlayStation 2", PS2_ROOT_SIZE);
     const Olnk xroot(xbox.read, 0);
     int done = 0;
     const int total = (gamecube ? 20 : 0) + (ps2 ? 20 : 0) + 2;
