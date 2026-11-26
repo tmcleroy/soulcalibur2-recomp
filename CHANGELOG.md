@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+Fixes and additions from players' reports: Link and Heihachi in Survival's and Time Attack's guest battles,
+widescreen in its right shape, the other consoles' title screens, a choice of which gamepad plays which player, and
+clearer messages when the guests can't be built. Build the guests again after updating (the launcher asks): the
+other consoles' title screens come from them.
+
 - **Which gamepad is which player's**: the launcher's Controllers page gives each connected gamepad Automatic,
   Player 1, Player 2 or Not used, and the game plays them so. A Steam Deck's own controls can be Not used, so two
   gamepads plugged into it play each other. With nothing chosen the gamepads play in the order connected, as before
@@ -15,15 +20,12 @@
   the results screen's beaten characters now show them when they were beaten.
 - **Link and Heihachi count in the results' wins**: a run's total of wins on the results screen (Survival's and the
   others') left out the wins over Link and Heihachi, so 8 wins with one over Link showed 7.
-- **A clearer error when the guests can't be built from a GameCube image**: it now says what it found instead of a
-  texture bank and, when the image isn't the retail disc's (another version, or files of another size), says so: a
-  trimmed or re-packed image needs replacing with a full dump.
 - **Link and Heihachi in Extra Time Attack**: two of its courses fight Spawn at one battle, where the GameCube's
   fight Link and the PlayStation 2's Heihachi. That battle is now one of the three, as in Extra Survival.
 - **Building the guests says what is wrong with a disc**: a GameCube or PlayStation 2 disc image that is another
-  version, changed by a tool (trimmed, NKit, re-packed) or cut short now gets a message saying so, where it stopped
-  with "not a VGT bank" or "olnk entry cut short". On Android, a disc the system could not read whole is no longer
-  taken as copied.
+  version, changed by a tool (trimmed, NKit, re-packed) or cut short now gets a message saying so (and, for a
+  GameCube image that fails to convert, how it differs from the retail disc), where it stopped with "not a VGT bank"
+  or "olnk entry cut short". On Android, a disc the system could not read whole is no longer taken as copied.
 - **Widescreen in its right shape**: in the game's 16:9 mode the menus, screens and the fight's HUD were stretched by
   a third, and the fights about 6% too wide. The 2D now keeps its 4:3 shape in the middle of the picture (backgrounds
   and fades still fill it), and fights are shown at true 16:9.
