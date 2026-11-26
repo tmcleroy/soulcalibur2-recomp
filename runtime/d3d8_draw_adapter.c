@@ -196,9 +196,10 @@ static void widescreen_projection(float projection[16])
    16:9 picture stretched by a third (as the Xbox's own on a 16:9 television). Screen-space draws (pretransformed, or
    through an orthographic projection) on the 640x480 picture are drawn 3/4 as wide about its middle, so the 2D keeps
    its shape, as a 4:3 picture in the middle of the 16:9 one; ones across the whole width (backgrounds, fades, screen
-   effects) still cover it, and points at the left or right edge stay there. True when the draw was narrowed. */
+   effects) still cover it, points at the left or right edge stay there, and a narrow piece at an edge (the select
+   frame's pillars) stays at it. True when the draw was narrowed. */
 static bool widescreen_2d(const RecompD3dVertexLayout *layout, RecompD3dPresenterDrawCommand *draw,
-                          const float viewport[6], uint8_t **packed)
+                          const float viewport[6], uint8_t **packed, float *moved_by)
 {
     static int wide = -1;
     if (wide < 0) {
@@ -225,8 +226,13 @@ static bool widescreen_2d(const RecompD3dVertexLayout *layout, RecompD3dPresente
     if (low <= left + 1.0f && high >= right - 1.0f) return false;
     const float *t = draw->transform;
     /* (a band or panel out to an edge, a quarter of the width or more; a narrow piece there, a frame's pillar,
-       moves in whole) */
-    const bool at_edge = (low <= left + 1.0f || high >= right - 1.0f) && high - low >= viewport[2] * 0.25f;
+       keeps its shape and moves with the edge, shift pixels, so it is still at it) */
+    const bool touches = low <= left + 1.0f || high >= right - 1.0f;
+    const bool at_edge = touches && high - low >= viewport[2] * 0.25f;
+    const float shift = !touches || at_edge ? 0.0f
+                        : low <= left + 1.0f ? low - (centre + (low - centre) * 0.75f)
+                                             : high - (centre + (high - centre) * 0.75f);
+    *moved_by = shift;
     if (!layout->pretransformed && (!at_edge || fabsf(t[0]) < 1e-12f || t[1] != 0.0f)) {
         /* (the whole draw through its transform; one at an edge whose x is not the position's own, turned or
            sheared, is left as it is) */
@@ -234,7 +240,7 @@ static bool widescreen_2d(const RecompD3dVertexLayout *layout, RecompD3dPresente
         draw->transform[0] *= 0.75f;
         draw->transform[4] *= 0.75f;
         draw->transform[8] *= 0.75f;
-        draw->transform[12] *= 0.75f;
+        draw->transform[12] = draw->transform[12] * 0.75f + shift * 2.0f / viewport[2] * draw->transform[15];
         return true;
     }
     if (*packed == NULL) {
@@ -254,7 +260,7 @@ static bool widescreen_2d(const RecompD3dVertexLayout *layout, RecompD3dPresente
         if (!layout->pretransformed)
             x = left + ((position[0] * t[0] + position[1] * t[4] + position[2] * t[8] + t[12]) + 1.0f) * 0.5f * viewport[2];
         if (at_edge && (x <= left + 1.0f || x >= right - 1.0f)) continue;
-        const float moved = centre + (x - centre) * 0.75f;
+        const float moved = centre + (x - centre) * 0.75f + shift;
         if (layout->pretransformed) position[0] = moved;
         else position[0] += (moved - x) * 2.0f / viewport[2] / t[0];
         memcpy(v, &position[0], sizeof position[0]);
@@ -2354,12 +2360,14 @@ static void submit_draw(uint32_t primitive, uint32_t count, uint32_t vertices,
             (int32_t)(viewport.x + viewport.width), (int32_t)(viewport.y + viewport.height)};
         memcpy(draw->scissor, clip, sizeof clip);
     }
-    if (!program && (layout.pretransformed || flat) && widescreen_2d(&layout, draw, rect, &packed) && scissors != 0u) {
+    float moved_by = 0.0f;
+    if (!program && (layout.pretransformed || flat) && widescreen_2d(&layout, draw, rect, &packed, &moved_by) &&
+        scissors != 0u) {
         const float centre = rect[0] + rect[2] * 0.5f;
         if ((float)draw->scissor[0] > rect[0] + 1.0f)
-            draw->scissor[0] = (int32_t)floorf(centre + ((float)draw->scissor[0] - centre) * 0.75f);
+            draw->scissor[0] = (int32_t)floorf(centre + ((float)draw->scissor[0] - centre) * 0.75f + moved_by);
         if ((float)draw->scissor[2] < rect[0] + rect[2] - 1.0f)
-            draw->scissor[2] = (int32_t)ceilf(centre + ((float)draw->scissor[2] - centre) * 0.75f);
+            draw->scissor[2] = (int32_t)ceilf(centre + ((float)draw->scissor[2] - centre) * 0.75f + moved_by);
     }
     const RecompD3dRenderStateModel *state = recomp_d3d8_state_model();
     const bool native_line = primitive == 2u && !program && draw->fvf == 0x42u &&
