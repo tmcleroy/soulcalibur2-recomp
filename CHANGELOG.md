@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- **Sharper PlayStation 2 and GameCube pictures**: the PlayStation 2's title screens, Heihachi's portraits and
+  illustrations, and his model's 8-bit textures had specks along every edge: a mistake reading the PS2's 8-bit
+  image layout put some pixel pairs in each other's places. The GameCube's and PlayStation 2's title screens (640x448)
+  were also shrunk to the Xbox's 512x512 by dropping columns and doubling rows, which made lettering jagged; they are
+  now filtered. Build the guests again after updating (the launcher asks).
+
 ## 0.7.0-beta.1
 
 Fixes and additions from players' reports: Link and Heihachi in Survival's and Time Attack's guest battles,
