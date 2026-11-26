@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <cstdio>
 #include <cstdlib>
 #include <map>
@@ -349,6 +350,83 @@ void put_words(Bytes &b, size_t at, std::initializer_list<uint32_t> words)
     }
 }
 
+/* One axis of a resample: for each of `to` places, the `from` places it takes from and their weights (a tent as wide
+   as a source pixel, or as an output pixel when shrinking, so every source pixel counts). */
+std::vector<std::vector<std::pair<uint32_t, float>>> resample_weights(uint32_t from, uint32_t to)
+{
+    std::vector<std::vector<std::pair<uint32_t, float>>> out(to);
+    const float scale = float(from) / float(to), radius = std::max(1.0f, scale);
+    for (uint32_t i = 0; i < to; ++i) {
+        const float centre = (float(i) + 0.5f) * scale - 0.5f;
+        const int first = int(std::floor(centre - radius)) + 1, last = int(std::ceil(centre + radius)) - 1;
+        float total = 0;
+        for (int s = first; s <= last; ++s) {
+            const float w = 1.0f - std::fabs(float(s) - centre) / radius;
+            if (w <= 0) continue;
+            out[i].emplace_back(uint32_t(std::clamp(s, 0, int(from) - 1)), w);
+            total += w;
+        }
+        for (auto &p : out[i]) p.second /= total;
+    }
+    return out;
+}
+
+/* The image's indices at width x height: the same indices at its own size; otherwise resampled (filtered, the
+   colours weighted by their alpha) and each texel given the palette's nearest colour, so a picture shrunk or grown
+   to the Xbox's size keeps its lines and lettering instead of losing or doubling whole rows and columns. */
+Bytes resampled_indices(const Paletted &image, uint32_t width, uint32_t height)
+{
+    if (image.width == width && image.height == height) return image.indices;
+    const auto colour = [&](uint8_t i) {   /* premultiplied R, G, B, then A, all 0..255 */
+        const float a = image.palette[4 * i + 3];
+        return std::array<float, 4>{image.palette[4 * i + 2] * a / 255.0f, image.palette[4 * i + 1] * a / 255.0f,
+                                    image.palette[4 * i] * a / 255.0f, a};
+    };
+    const auto across = resample_weights(image.width, width), down = resample_weights(image.height, height);
+    std::vector<std::array<float, 4>> rows(size_t(width) * image.height);
+    for (uint32_t y = 0; y < image.height; ++y)
+        for (uint32_t x = 0; x < width; ++x) {
+            std::array<float, 4> sum{};
+            for (const auto &[s, w] : across[x]) {
+                const auto c = colour(image.indices[size_t(y) * image.width + s]);
+                for (int n = 0; n < 4; ++n) sum[n] += c[n] * w;
+            }
+            rows[size_t(y) * width + x] = sum;
+        }
+    std::map<uint32_t, uint8_t> nearest;
+    Bytes out(size_t(width) * height);
+    for (uint32_t y = 0; y < height; ++y)
+        for (uint32_t x = 0; x < width; ++x) {
+            std::array<float, 4> sum{};
+            for (const auto &[s, w] : down[y]) {
+                const auto &c = rows[size_t(s) * width + x];
+                for (int n = 0; n < 4; ++n) sum[n] += c[n] * w;
+            }
+            const float a = sum[3];
+            int t[4];
+            for (int n = 0; n < 3; ++n) t[n] = int(std::lround(a > 0 ? std::min(255.0f, sum[n] * 255.0f / a) : 0.0f));
+            t[3] = int(std::lround(a));
+            const uint32_t key = uint32_t(t[0]) | uint32_t(t[1]) << 8 | uint32_t(t[2]) << 16 | uint32_t(t[3]) << 24;
+            auto found = nearest.find(key);
+            if (found == nearest.end()) {
+                uint8_t best = 0;
+                long best_distance = -1;
+                for (int i = 0; i < 256; ++i) {
+                    const int a2 = image.palette[4 * i + 3];
+                    /* a transparent texel matches any transparent entry: its colour is not seen */
+                    const bool clear = t[3] == 0 && a2 == 0;
+                    const int dr = clear ? 0 : t[0] - image.palette[4 * i + 2], dg = clear ? 0 : t[1] - image.palette[4 * i + 1],
+                              db = clear ? 0 : t[2] - image.palette[4 * i], da = t[3] - a2;
+                    const long d = long(dr) * dr + long(dg) * dg + long(db) * db + 2L * da * da;
+                    if (best_distance < 0 || d < best_distance) best_distance = d, best = uint8_t(i);
+                }
+                found = nearest.emplace(key, best).first;
+            }
+            out[size_t(y) * width + x] = found->second;
+        }
+    return out;
+}
+
 } // namespace
 
 /* "not a VGT bank", with what the entry holds instead (all zeros: an image with the file's data taken out). */
@@ -480,11 +558,9 @@ Bytes paletted_bank(const std::vector<std::pair<uint32_t, Paletted>> &images, ui
         const Paletted &image = images[k].second;
         std::copy(image.palette.begin(), image.palette.end(), out.begin() + long(palettes_at + 0x400 * k));
         const size_t base = data_at + size_t(size) * size * k;
-        for (uint32_t y = 0; y < size; ++y) {
-            const size_t row = size_t(y * image.height / size) * image.width;
-            for (uint32_t x = 0; x < size; ++x)
-                out[base + swizzle(x, y, size, size)] = image.indices[row + size_t(x) * image.width / size];
-        }
+        const Bytes indices = resampled_indices(image, size, size);
+        for (uint32_t y = 0; y < size; ++y)
+            for (uint32_t x = 0; x < size; ++x) out[base + swizzle(x, y, size, size)] = indices[size_t(y) * size + x];
         put_words(out, 0x14 + 0x24 * k,
                   {uint32_t(descriptors + 12 * k), entry_flags, 0, dims, uint32_t(base), D3D_P8, dims, 1, 0});
         put_words(out, descriptors + 12 * k, {uint32_t(palettes_at + 0x400 * k), 0x100, 0});
@@ -614,11 +690,9 @@ Bytes replace_p8(const Bytes &vxt, uint32_t k, const Paletted &image)
     std::copy(image.palette.begin(), image.palette.end(), out.begin() + palette_at);
     need(out, offset, size_t(sw) * sh);
     std::fill(out.begin() + offset, out.begin() + offset + long(size_t(sw) * sh), 0);
-    for (uint32_t y = 0; y < ih; ++y) {
-        const size_t row = size_t(y * image.height / ih) * image.width;
-        for (uint32_t x = 0; x < iw; ++x)
-            out.at(offset + swizzle(x, y, sw, sh)) = image.indices[row + size_t(x) * image.width / iw];
-    }
+    const Bytes indices = resampled_indices(image, iw, ih);
+    for (uint32_t y = 0; y < ih; ++y)
+        for (uint32_t x = 0; x < iw; ++x) out.at(offset + swizzle(x, y, sw, sh)) = indices[size_t(y) * iw + x];
     return out;
 }
 
