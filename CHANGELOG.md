@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+Fixes from players' reports: the character select screen's frame in widescreen, and sharper pictures from the
+PlayStation 2 and GameCube discs. Build the guests again after updating (the launcher asks).
+
 - **Widescreen: the select screen's frame at the edges**: the gold pillars at the sides of the character select
   screen (and the menus' corner ornaments) stood a sixth of the way in from each edge in widescreen, as bars across
   the background. They are at the edges again, as in 4:3.
