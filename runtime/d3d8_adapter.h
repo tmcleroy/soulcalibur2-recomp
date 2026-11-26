@@ -27,6 +27,9 @@ void recomp_d3d8_shutdown(void);
    and presents it. Call from recomp_d3d_present_hook, between guest frames. */
 void recomp_d3d8_present_card(const uint32_t *pixels, uint32_t width, uint32_t height,
     float display_aspect, uint8_t level);
+/* Whether the frame being drawn is a widescreen one (in RECOMP_D3D_WIDESCREEN's 16:9: a fight's), or is drawn and shown
+   4:3 (the menus and other screens). */
+bool recomp_d3d8_frame_wide(void);
 /* The presenter, once CreateDevice made it (NULL before). */
 RecompD3dPresenter *recomp_d3d8_presenter(void);
 /* Swaps presented so far (the guest's frame counter). */

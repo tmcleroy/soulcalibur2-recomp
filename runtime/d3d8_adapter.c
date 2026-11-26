@@ -697,6 +697,25 @@ static void clear(void)
     recomp_runtime.registers.esp = entry + 28u;
 }
 
+/* SC2's 16:9 mode in its fights only. The game lays its menus and screens out on 640x480 as in 4:3 (the 16:9 mode
+   narrows only its fights' cameras), so outside a fight (scene [0x398700] 7), the attract mode's fighter profiles
+   between its demonstration fights (9) and the Arcade ending (13), which are 3D across the picture, a frame is drawn as the 4:3 game draws it and shown 4:3, black at the sides: the select
+   screens' portraits and models keep their shape as on a 4:3 television (a player's report, 2026-11-26). Decided
+   at each Swap for the frame drawn after it; the presenter takes it with the frame it is drawn into. */
+static int frame_wide = -1;
+
+static bool scene_wide(void)
+{
+    const uint32_t scene = *recomp_memory_u32(0x00398700u);
+    return scene == 7u || scene == 9u || scene == 13u;
+}
+
+bool recomp_d3d8_frame_wide(void)
+{
+    if (frame_wide < 0) frame_wide = scene_wide();
+    return frame_wide != 0;
+}
+
 static void swap(void)
 {
     const uint32_t entry = recomp_runtime.registers.esp;
@@ -716,7 +735,14 @@ static void swap(void)
     if (!sc2_fast_forward) recomp_d3d_wait_present();
     /* (clean view, the HUD hidden: a match's letterbox left off, the picture filling the window) */
     recomp_d3d_present_crop = recomp_scene_freeze_overlay_hidden() ? letterbox_share : 0.0f;
+    /* (a Swap that keeps the shown frame, while the game loads, keeps it at the shape it was shown at) */
+    if (!result.command.data.present.keep_shown && recomp_d3d_present_narrow == recomp_d3d8_frame_wide()) {
+        recomp_d3d_present_narrow = !recomp_d3d8_frame_wide();
+        fprintf(stderr, "recomp d3d8: frames shown %s (scene %u)\n", recomp_d3d_present_narrow ? "4:3" : "as set",
+            *recomp_memory_u32(0x00398700u));
+    }
     recomp_d3d8_submit(&result.command);
+    frame_wide = scene_wide();
     back_buffer_displayed = true;
     back_buffer_saved = false;
     if (display_mode_pending) {

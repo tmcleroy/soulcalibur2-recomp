@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- **Widescreen: the menus in 4:3**: in widescreen the menus and select screens were drawn across the 16:9 picture,
+  so the character select's portraits came out squashed, its fighters stretched, and Survival's panels out of place.
+  Everything but the fights (and the attract mode's fights and the Arcade ending) is now shown 4:3, black at the
+  sides, as the game draws it; the fights stay 16:9.
 - **Android with Adreno graphics**: the screens held while the game loads (the opening's notices and the namco
   logo) could show stripes and scattered specks on phones and handhelds with Qualcomm graphics, such as the Retroid
   Flip 2. The copy of the shown frame is now made the way the frame itself is.
