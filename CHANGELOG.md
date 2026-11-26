@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.7.1-beta.1
 
 Fixes from players' reports: the character select screen's frame in widescreen, and sharper pictures from the
 PlayStation 2 and GameCube discs. Build the guests again after updating (the launcher asks).
