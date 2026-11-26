@@ -289,7 +289,8 @@ ear, a person playing.
   In a band or panel built out to the left or right edge (a quarter of the
   width or more: the versus screen's name bars, the menus' panels) the points
   at the edge stay there, so it still reaches it and its pieces still meet;
-  narrower pieces there (the select frame's pillars) move in whole.
+  narrower pieces there (the select frame's pillars, the menus' corner ornaments)
+  keep their narrowed shape and stay at the edge they touch.
   Its cameras narrow their horizontal scale from 0.77 of the vertical to
   0.612 where 16:9 needs 0.5775 (0.77 x 3/4), so the 3D was 6% too wide
   as well: `widescreen_projection` narrows perspective projections with
