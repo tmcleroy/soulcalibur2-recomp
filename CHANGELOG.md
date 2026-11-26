@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.7.0-beta.1
 
 Fixes and additions from players' reports: Link and Heihachi in Survival's and Time Attack's guest battles,
 widescreen in its right shape, the other consoles' title screens, a choice of which gamepad plays which player, and
