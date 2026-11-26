@@ -22,6 +22,7 @@
 #include "audio_output.h"
 #include "d3d8_adapter.h"
 #include "d3d_shader_preset.h"
+#include "d3d_vblank.h"
 #include "input_host_win32.h"
 #include "input_keyboard_win32.h"
 extern "C" {
@@ -341,7 +342,7 @@ bool SDLCALL MouseWatch(void *, SDL_Event *event)
 }
 
 /* Where the presenter shows the menu's picture in a window (d3d_backend_show_image's place, in the window's pixels):
-   the game's aspect (16:9 with widescreen, else 4:3), as large as the window allows, in its middle, black around */
+   the game's aspect (16:9 with widescreen, else 4:3, and 4:3 for a frame shown so: recomp_d3d_present_narrow), as large as the window allows, in its middle, black around */
 recomp::sdl::MenuPlace PictureIn(SDL_Window *window, uint32_t width, uint32_t height)
 {
     recomp::sdl::MenuPlace place;
@@ -352,7 +353,8 @@ recomp::sdl::MenuPlace PictureIn(SDL_Window *window, uint32_t width, uint32_t he
         swap_height <= 0)
         return place;
     const char *wide = std::getenv("RECOMP_D3D_WIDESCREEN");
-    const float aspect = wide != nullptr && wide[0] != '\0' && std::strcmp(wide, "0") != 0 ? 16.0f / 9.0f : 4.0f / 3.0f;
+    const float aspect = wide != nullptr && wide[0] != '\0' && std::strcmp(wide, "0") != 0 && !recomp_d3d_present_narrow
+        ? 16.0f / 9.0f : 4.0f / 3.0f;
     int x = 0, y = 0, w = swap_width, h = swap_height;
     if (static_cast<float>(swap_width) / swap_height > aspect) {
         w = static_cast<int>(swap_height * aspect + 0.5f);

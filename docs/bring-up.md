@@ -291,6 +291,13 @@ ear, a person playing.
   at the edge stay there, so it still reaches it and its pieces still meet;
   narrower pieces there (the select frame's pillars, the menus' corner ornaments)
   keep their narrowed shape and stay at the edge they touch.
+  Only the fights are shown so: outside scene 7 (fights, the attract mode's
+  too), 9 (the attract mode's fighter profiles) and 13 (the Arcade ending)
+  a frame is drawn as the 4:3 game draws it (no narrowing, the cameras put
+  back to 0.77) and shown 4:3, black at the sides (the presenter's
+  `recomp_d3d_present_narrow`; `recomp_d3d8_frame_wide`, decided at each
+  Swap). The select screens' portraits and models had no 16:9 layout to
+  narrow into: their pieces came out squashed or out of place.
   Its cameras narrow their horizontal scale from 0.77 of the vertical to
   0.612 where 16:9 needs 0.5775 (0.77 x 3/4), so the 3D was 6% too wide
   as well: `widescreen_projection` narrows perspective projections with

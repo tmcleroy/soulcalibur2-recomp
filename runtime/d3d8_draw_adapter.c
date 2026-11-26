@@ -174,7 +174,8 @@ static uint32_t stream_vertices(uint32_t first, uint32_t *stride)
 
 /* SC2's 16:9 mode (the Xbox's widescreen video setting) narrows its cameras' horizontal scale from 0.77 of the
    vertical (4:3) to 0.612, where the same picture shown 16:9 needs 0.77 x 3/4 = 0.5775: its 3D came out 6% too
-   wide. A perspective projection with the 16:9 mode's ratio is narrowed to it (the x column, about the centre). */
+   wide. A perspective projection with the 16:9 mode's ratio is narrowed to it (the x column, about the centre); in a
+   frame shown 4:3 (recomp_d3d8_frame_wide, the menus) it is put back to the 4:3 game's 0.77. */
 static void widescreen_projection(float projection[16])
 {
     static int wide = -1;
@@ -185,7 +186,7 @@ static void widescreen_projection(float projection[16])
     if (!wide || projection[11] == 0.0f || projection[5] == 0.0f) return;
     const float ratio = fabsf(projection[0] / projection[5]);
     if (ratio < 0.60f || ratio > 0.625f) return;
-    const float k = 0.77f * 0.75f / ratio;
+    const float k = (recomp_d3d8_frame_wide() ? 0.77f * 0.75f : 0.77f) / ratio;
     projection[0] *= k;
     projection[4] *= k;
     projection[8] *= k;
@@ -206,7 +207,9 @@ static bool widescreen_2d(const RecompD3dVertexLayout *layout, RecompD3dPresente
         const char *env = getenv("RECOMP_D3D_WIDESCREEN");
         wide = env != NULL && env[0] != '\0' && strcmp(env, "0") != 0;
     }
-    if (!wide || viewport[2] != 640.0f || viewport[3] < 448.0f || draw->vertex_count == 0u) return false;
+    if (!wide || !recomp_d3d8_frame_wide() || viewport[2] != 640.0f || viewport[3] < 448.0f ||
+        draw->vertex_count == 0u)
+        return false;
     const uint8_t *bytes = (const uint8_t *)draw->vertex_bytes;
     const uint32_t stride = draw->vertex_stride, at = layout->position_offset;
     float low = 1e30f, high = -1e30f;
