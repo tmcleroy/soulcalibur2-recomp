@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.8.0-beta.1
 
 Fixes, most from players' reports: Link and Heihachi in Extra Arcade, the menus in 4:3 in widescreen, the frame
 meter while paused, a stray card on the stage select, and the stripes on Android handhelds with Qualcomm graphics.
