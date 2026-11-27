@@ -697,8 +697,8 @@ static void clear(void)
     recomp_runtime.registers.esp = entry + 28u;
 }
 
-/* SC2's 16:9 mode in its fights only. The game lays its menus and screens out on 640x480 as in 4:3 (the 16:9 mode
-   narrows only its fights' cameras), so outside a fight (scene [0x398700] 7), the attract mode's fighter profiles
+/* SC2's 16:9 mode in its fights only. The game lays its menus and screens out on 640x480 (its 16:9 mode narrows its
+   cameras and its sprites, follow_frame_shape), so outside a fight (scene [0x398700] 7), the attract mode's fighter profiles
    between its demonstration fights (9) and the Arcade ending (13), which are 3D across the picture, a frame is drawn as the 4:3 game draws it and shown 4:3, black at the sides: the select
    screens' portraits and models keep their shape as on a 4:3 television (a player's report, 2026-11-26). Decided
    at each Swap for the frame drawn after it; the presenter takes it with the frame it is drawn into. */
@@ -714,6 +714,19 @@ bool recomp_d3d8_frame_wide(void)
 {
     if (frame_wide < 0) frame_wide = scene_wide();
     return frame_wide != 0;
+}
+
+/* The game's 16:9 mode lays out more of its 2D than its fights: its sprites (0x2ABC0 and the rest that ask 0x20250)
+   are narrowed about the middle for a 16:9 television, by the 2D layer's widescreen byte ([0x38E570] + 0x4C, set at
+   boot from the video setting), so the select screens' icons and portraits came out a fifth too narrow in a frame
+   shown 4:3. That byte follows the frame's shape: the game's own 4:3 layout in a frame shown 4:3, its 16:9 one in
+   the fights. */
+static void follow_frame_shape(void)
+{
+    /* (the game's 16:9 mode: the display's widescreen byte 0x38F908, which the byte is copied from at boot) */
+    const uint32_t layer = *recomp_memory_u32(0x0038e570u);
+    if (layer == 0u || *(const uint8_t *)recomp_memory(0x0038f908u, 1u) == 0u) return;
+    *(uint8_t *)recomp_memory(layer + 0x4cu, 1u) = frame_wide != 0;
 }
 
 static void swap(void)
@@ -743,6 +756,7 @@ static void swap(void)
     }
     recomp_d3d8_submit(&result.command);
     frame_wide = scene_wide();
+    follow_frame_shape();
     back_buffer_displayed = true;
     back_buffer_saved = false;
     if (display_mode_pending) {

@@ -280,8 +280,8 @@ ear, a person playing.
   is: a match at 3x renders at 1920x1440.
 - SC2 has its own 16:9 mode, chosen by the Xbox video setting's widescreen
   bit; `RECOMP_D3D_WIDESCREEN=1` sets it (shared kernel_config) and the
-  presenter shows 16:9 (1707x960 at 2x). The game lays its 2D out on the
-  same 640x480 either way, so shown 16:9 it was a third too wide (as the
+  presenter shows 16:9 (1707x960 at 2x). The game lays its fights' 2D out on
+  the same 640x480 either way, so shown 16:9 it was a third too wide (as the
   Xbox's on a 16:9 television): screen-space draws (pretransformed, or
   through an affine SetModelView composite) on the 640x448/480 picture are
   drawn 3/4 as wide about its middle unless they span its whole width
@@ -297,7 +297,21 @@ ear, a person playing.
   back to 0.77) and shown 4:3, black at the sides (the presenter's
   `recomp_d3d_present_narrow`; `recomp_d3d8_frame_wide`, decided at each
   Swap). The select screens' portraits and models had no 16:9 layout to
-  narrow into: their pieces came out squashed or out of place.
+  narrow into: their pieces came out squashed or out of place. Outside the
+  fights the 16:9 mode does narrow the game's own sprites (0x2ABC0 and the
+  others that ask 0x20250: x about 320 by [0x176D74]) by the 2D layer's
+  widescreen byte, [0x38E570] + 0x4C, copied at boot from the display's
+  0x38F908: in a frame shown 4:3 that byte is cleared (`follow_frame_shape`
+  in d3d8_adapter.c), so those frames get the game's 4:3 layout.
+  In the fights a plain-colour piece at an edge (the ends of the subtitles'
+  bar) stretches with the band it ends; a textured one keeps its shape.
+- `SetBackBufferScale(x, y)`: the 480-line 4:3 mode (display +0x44B = 2) sets
+  y 0.889 (0x38FAE0, and +0x620) and draws its 2D through SetModelView that
+  much shorter, from the viewport's top; the Xbox's display stretches the
+  scaled back buffer to the whole picture. The device here draws the 3D full
+  size, so orthographic SetModelView draws are stretched back alone
+  (`back_buffer_unscale`): before, the 4:3 menus' 2D stopped at 89% of the
+  height with black under it. The 16:9 mode (720 lines, +0x44B = 1) has 1.
   Its cameras narrow their horizontal scale from 0.77 of the vertical to
   0.612 where 16:9 needs 0.5775 (0.77 x 3/4), so the 3D was 6% too wide
   as well: `widescreen_projection` narrows perspective projections with

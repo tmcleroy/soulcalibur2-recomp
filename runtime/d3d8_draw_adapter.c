@@ -193,6 +193,13 @@ static void widescreen_projection(float projection[16])
     projection[12] *= k;
 }
 
+/* Stage 0 has a texture (a resource, or one written inline in the push buffer). */
+static bool stage0_textured(uint32_t device)
+{
+    RecompD3dTextureDesc inline_texture;
+    return *recomp_memory_u32(device + 0xb68u) != 0u || recomp_d3d8_resource_inline_texture(0u, &inline_texture);
+}
+
 /* The 2D in SC2's 16:9 mode: the game lays its menus, screens and HUD out on the same 640x480 as in 4:3, which the
    16:9 picture stretched by a third (as the Xbox's own on a 16:9 television). Screen-space draws (pretransformed, or
    through an orthographic projection) on the 640x480 picture are drawn 3/4 as wide about its middle, so the 2D keeps
@@ -200,7 +207,7 @@ static void widescreen_projection(float projection[16])
    effects) still cover it, points at the left or right edge stay there, and a narrow piece at an edge (the select
    frame's pillars) stays at it. True when the draw was narrowed. */
 static bool widescreen_2d(const RecompD3dVertexLayout *layout, RecompD3dPresenterDrawCommand *draw,
-                          const float viewport[6], uint8_t **packed, float *moved_by)
+                          const float viewport[6], bool textured, uint8_t **packed, float *moved_by)
 {
     static int wide = -1;
     if (wide < 0) {
@@ -228,10 +235,11 @@ static bool widescreen_2d(const RecompD3dVertexLayout *layout, RecompD3dPresente
     const float left = viewport[0], right = viewport[0] + viewport[2], centre = left + viewport[2] * 0.5f;
     if (low <= left + 1.0f && high >= right - 1.0f) return false;
     const float *t = draw->transform;
-    /* (a band or panel out to an edge, a quarter of the width or more; a narrow piece there, a frame's pillar,
-       keeps its shape and moves with the edge, shift pixels, so it is still at it) */
+    /* (a band or panel out to an edge, a quarter of the width or more, or a plain colour's piece of one: the ends of
+       the bar under a fight's subtitles, which left gaps between them and its middle; a narrow textured piece
+       there, a frame's pillar, keeps its shape and moves with the edge, shift pixels, so it is still at it) */
     const bool touches = low <= left + 1.0f || high >= right - 1.0f;
-    const bool at_edge = touches && high - low >= viewport[2] * 0.25f;
+    const bool at_edge = touches && (high - low >= viewport[2] * 0.25f || !textured);
     const float shift = !touches || at_edge ? 0.0f
                         : low <= left + 1.0f ? low - (centre + (low - centre) * 0.75f)
                                              : high - (centre + (high - centre) * 0.75f);
@@ -2112,6 +2120,23 @@ static uint8_t *transform_texcoords(uint32_t device, const RecompD3dVertexLayout
     return out;
 }
 
+/* SetBackBufferScale(x, y): the Xbox draws into that share of the back buffer and its display stretches it back to
+   the whole picture. SC2's 4:3 modes set y 0.889 (480 lines) or 0.804 (and x 0.575) and draw their 2D, which goes
+   through SetModelView past the device's own scaling, that much smaller, about the viewport's top left; the 3D the
+   device draws full size here (its scale is not applied), so the 2D is stretched back alone: without it the menus and
+   select screens' 2D stopped at 89% of the height, black under it, and came out a ninth too flat. */
+static float back_buffer_scale[2] = {1.0f, 1.0f};
+
+static void back_buffer_unscale(float t[16])
+{
+    /* (clip x about the viewport's left, -w, and y about its top, +w) */
+    for (uint32_t row = 0u; row < 4u; ++row) {
+        float *r = t + row * 4u;
+        if (back_buffer_scale[0] < 1.0f) r[0] = (r[0] + r[3]) / back_buffer_scale[0] - r[3];
+        if (back_buffer_scale[1] < 1.0f) r[1] = r[3] - (r[3] - r[1]) / back_buffer_scale[1];
+    }
+}
+
 /* The clip-space transform for a SetModelView composite. NV2A applies the
    composite to vertices and reads pixels of the (supersampled) target:
    pixel = (v C).xy / w + viewport origin, depth = (v C).z / w / zscale.
@@ -2323,6 +2348,7 @@ static void submit_draw(uint32_t primitive, uint32_t count, uint32_t vertices,
         draw->has_transform = true;
         flat = draw->transform[3] == 0.0f && draw->transform[7] == 0.0f && draw->transform[11] == 0.0f &&
                draw->transform[15] != 0.0f;
+        if (flat && model_view_active) back_buffer_unscale(draw->transform);
         draw->blend_weight_count = layout.blend_weight_count;
         if (layout.blend_weight_count != 0u &&
             *recomp_memory_u32(0x0015e5b4u) != layout.blend_weight_count * 2u - 1u)
@@ -2364,7 +2390,7 @@ static void submit_draw(uint32_t primitive, uint32_t count, uint32_t vertices,
         memcpy(draw->scissor, clip, sizeof clip);
     }
     float moved_by = 0.0f;
-    if (!program && (layout.pretransformed || flat) && widescreen_2d(&layout, draw, rect, &packed, &moved_by) &&
+    if (!program && (layout.pretransformed || flat) && widescreen_2d(&layout, draw, rect, stage0_textured(device), &packed, &moved_by) &&
         scissors != 0u) {
         const float centre = rect[0] + rect[2] * 0.5f;
         if ((float)draw->scissor[0] > rect[0] + 1.0f)
@@ -2707,10 +2733,7 @@ static void logic_op(void)
     kernel_return(1u, 0u);
 }
 
-/* SetBackBufferScale(x, y), stdcall floats in (0, 1]: SC2 draws into the top
-   0.889 of its back buffer (its 10x11 pixel-aspect mode). Recorded for the
-   draw path; shortcut: the presenter does not yet scale the viewport. */
-static float back_buffer_scale[2] = {1.0f, 1.0f};
+/* SetBackBufferScale(x, y), stdcall floats in (0, 1]: back_buffer_scale. */
 
 static void set_back_buffer_scale(void)
 {
