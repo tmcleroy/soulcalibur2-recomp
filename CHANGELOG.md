@@ -7,6 +7,9 @@
   laid out as the game does in 4:3. In 4:3 the menus, select screens and the fights' writing came out a ninth too
   flat, with a black band under them: the game draws them shorter for the Xbox to stretch to the whole picture,
   and now they are.
+- **The versus screen in 4:3**: in widescreen the screen before each fight, with the two fighters facing each other,
+  was stretched across the 16:9 picture. It is now shown 4:3 like the select screens, through its fade into the
+  stage; the fight itself stays 16:9.
 - **The subtitles' bar in widescreen**: the see-through bar behind the fights' subtitles had gaps near its ends.
   It now runs whole from edge to edge.
 

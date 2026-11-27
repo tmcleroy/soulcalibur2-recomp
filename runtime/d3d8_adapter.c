@@ -698,16 +698,27 @@ static void clear(void)
 }
 
 /* SC2's 16:9 mode in its fights only. The game lays its menus and screens out on 640x480 (its 16:9 mode narrows its
-   cameras and its sprites, follow_frame_shape), so outside a fight (scene [0x398700] 7), the attract mode's fighter profiles
+   cameras and its sprites, follow_frame_shape), so outside a fight (scene [0x398700] 7, its versus screen aside), the attract mode's fighter profiles
    between its demonstration fights (9) and the Arcade ending (13), which are 3D across the picture, a frame is drawn as the 4:3 game draws it and shown 4:3, black at the sides: the select
    screens' portraits and models keep their shape as on a 4:3 television (a player's report, 2026-11-26). Decided
    at each Swap for the frame drawn after it; the presenter takes it with the frame it is drawn into. */
 static int frame_wide = -1;
 
+/* A match's opening steps (0x3C000; the step [0x398942], frames into it [0x398944], counting through the whole
+   step): 2 the versus screen, the fighters' portraits facing each other, 1 the stage's introduction and the fight.
+   The versus screen is laid out as the select screens are, so it is shown 4:3 too, and so is the crossfade from it
+   into the stage (gone by 56 frames into step 1). */
+static bool versus_screen(void)
+{
+    const int16_t step = *(const int16_t *)recomp_memory(0x00398942u, 2u);
+    const int32_t frames = *(const int32_t *)recomp_memory(0x00398944u, 4u);
+    return step == 2 || (step == 1 && frames < 60);
+}
+
 static bool scene_wide(void)
 {
     const uint32_t scene = *recomp_memory_u32(0x00398700u);
-    return scene == 7u || scene == 9u || scene == 13u;
+    return (scene == 7u && !versus_screen()) || scene == 9u || scene == 13u;
 }
 
 bool recomp_d3d8_frame_wide(void)

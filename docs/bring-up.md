@@ -292,7 +292,8 @@ ear, a person playing.
   narrower pieces there (the select frame's pillars, the menus' corner ornaments)
   keep their narrowed shape and stay at the edge they touch.
   Only the fights are shown so: outside scene 7 (fights, the attract mode's
-  too), 9 (the attract mode's fighter profiles) and 13 (the Arcade ending)
+  too, but not their versus screen: the match's opening step [0x398942] 2,
+  and the first 60 frames of step 1, its crossfade into the stage), 9 (the attract mode's fighter profiles) and 13 (the Arcade ending)
   a frame is drawn as the 4:3 game draws it (no narrowing, the cameras put
   back to 0.77) and shown 4:3, black at the sides (the presenter's
   `recomp_d3d_present_narrow`; `recomp_d3d8_frame_wide`, decided at each
