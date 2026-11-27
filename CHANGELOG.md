@@ -12,6 +12,12 @@
   stage; the fight itself stays 16:9.
 - **The subtitles' bar in widescreen**: the see-through bar behind the fights' subtitles had gaps near its ends.
   It now runs whole from edge to edge.
+- **Link's and Heihachi's weapon demonstrations and Link's outfits as on their own discs**: Link's and Heihachi's
+  weapon demonstrations were open in the Exhibition Theater from the start, but missing from the Collection History
+  and not on sale in Weapon Master's shops; Link's two outfits were missing from both. Each is now an item of its
+  own, sold in the shops after Spawn's demonstration and shown in the Collection History beside the guest's
+  profile, with its picture from the guest's disc. As on the GameCube, Link's third and fourth costumes are bought.
+  Build the guests again after updating (the launcher asks).
 
 ## 0.8.0-beta.1
 

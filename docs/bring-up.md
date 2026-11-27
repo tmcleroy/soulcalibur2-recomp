@@ -229,7 +229,7 @@ Two more test aids: `SC2_TEST_KO=1` empties player 2's health in fights (`SC2_TE
 Survival run, which then ends on a loss and shows its results; an
 Arcade run to the ending takes about eight minutes headless), and
 `SC2_TEST_ITEMS=FIRST-LAST` owns those items (the item states at 0x3BB368: 3 is
-had) at the title. (Items 278-299 are the characters' own, their endings in the Museum's Demo Theater,
+had) at the title (`FIRST-LASTg`: the guests' own items too, sc2_guest_items.c). (Items 278-299 are the characters' own, their endings in the Museum's Demo Theater,
 Character Ending: 278 + the roster place.) Arcade's and VS Battle's character select is current scene
 10, a fight 7.
 
