@@ -51,6 +51,7 @@ extern void sub_00055010(void);
 extern void sub_00046550(void);
 extern void sub_00146610(void);
 extern void sub_0006A1F0(void);
+extern void sub_0006A6E0(void);
 extern void sub_00056250(void);
 extern void sub_000523A0(void);
 /* memmove (0x146610; memcpy calls it too): the C library's, copied natively. Its last bytes go through small jump
@@ -254,6 +255,28 @@ static void cell_setup(void)
 {
     museum_grid(museum_select_mode());
     sub_0006A1F0();
+}
+
+/* 0x6A6E0, a select cell's frame (thiscall: ECX the cell; its state at +0x7C, its place in the grid at +0x78, its x
+   offset at +0x54). As the select screen closes each card leaves (state 5, its progress at +0x60 rising by the frame
+   time [0x373F48] a 40th): the first four columns slide off the screen, 12.5 a frame time, and stop (6) once the
+   progress is past 1; the fifth column's turn in place and never stop, which on the Xbox's own grid stays out of sight
+   behind player 2's fighter. With the grid in rows of five the cells stand half a column left (cell_place), so the
+   fifth column's card of a character both players chose (the one card still drawn) went on turning beside player 2's
+   fighter on the stage select. Those slide off to the right too, as the third and fourth columns' do, and stop. */
+static void cell_frame(void)
+{
+    const uint32_t cell = recomp_runtime.registers.ecx;
+    sub_0006A6E0();
+    if (!sc2_select_grid_balanced() || *recomp_memory_u32(cell + 0x7cu) != 5u ||
+        *recomp_memory_u32(cell + 0x78u) % 5u != 4u) return;
+    float progress, x, step;
+    memcpy(&progress, recomp_memory(cell + 0x60u, 4u), 4u);
+    memcpy(&x, recomp_memory(cell + 0x54u, 4u), 4u);
+    memcpy(&step, recomp_memory(0x00373f48u, 4u), 4u);
+    x += step * 12.5f;
+    memcpy(recomp_memory(cell + 0x54u, 4u), &x, 4u);
+    if (progress > 1.0f) *recomp_memory_u32(cell + 0x7cu) = 6u;
 }
 
 /* 0x6B000(player, pressed), a select cursor's move (thiscall: the cursor's cell at +8, the cells it may take +4 to
@@ -885,6 +908,7 @@ RecompFunction recomp_sc2_hooks_lookup_manual(uint32_t address)
     case 0x0002abc0u: return sprite_draw;
     case 0x0006a190u: return cell_place;
     case 0x0006a1f0u: return cell_setup;
+    case 0x0006a6e0u: return cell_frame;
     case 0x0006b000u: return cursor_move;
     case 0x000698d0u: return character_available_bonus;
     case 0x000566f0u: return weapon_item;
