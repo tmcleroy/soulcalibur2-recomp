@@ -354,6 +354,12 @@ Still to do:
   Necrid, Inferno and the bonus fighters, and the PS2's leave out Heihachi the same way. The Xbox's let 27 and 28
   through (never available there), so `survival_draw_allowed` leaves them out. On every disc stage 4 is the Chapel
   and 6, Necrid's fights', the Egyptian Crypt.
+- Arcade draws its first six opponents (mode 1 of 0x56250) from 9-byte rows by the fight, one not yet met that the
+  mode lets in (0x464E0 column 1, or the bonus fighter test 0x46550); Extra Arcade's rows are at 0x1A0E27. Its rows
+  for fights 3 and 6 have Spawn, where the GameCube's (boot.dol, file offset 0x277647) have Link and the PS2's
+  (SLUS_206.43, 0x2F6E3F) Heihachi; fight 6's are Charade, the three bonus fighters and the guest. Link and Heihachi, never available on the Xbox, fail both tests, so they never
+  came up. In those two draws Spawn's place is one of the three, one not yet met and not the player's, and 0x46550
+  answers yes for the guests while the draw runs (`next_opponent`).
 - Practice's Command List and Show Move work for both (their move names and
   inputs from their own discs), and both come up as the computer's opponents in
   Extra Survival's guest battles, in either outfit, Link's bombs and all.

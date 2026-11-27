@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- **Link and Heihachi in Extra Arcade**: stages 3 and 6 of Extra Arcade can bring Spawn, where the GameCube's bring
+  Link and the PlayStation 2's Heihachi, but Link and Heihachi never came up. Spawn's place in those draws is now one of
+  the three, one not met yet in the run first.
 - **Widescreen: the menus in 4:3**: in widescreen the menus and select screens were drawn across the 16:9 picture,
   so the character select's portraits came out squashed, its fighters stretched, and Survival's panels out of place.
   Everything but the fights (and the attract mode's fights and the Arcade ending) is now shown 4:3, black at the
