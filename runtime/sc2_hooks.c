@@ -381,6 +381,7 @@ static void boss_form(void)
    Inferno meets them with Nightmare's moves the first time (issue #90). Here, while 0x55010 runs, 0x46550 answers
    yes for both: it is called once in it, for that test. */
 static int inferno_style_test;
+static int arcade_guest_draw;   /* next_opponent: Extra Arcade's draw with a guest in it */
 static void second_fighter(void)
 {
     ++inferno_style_test;
@@ -392,7 +393,7 @@ static void second_fighter(void)
 static void bonus_fighter(void)
 {
     const uint32_t character = *recomp_memory_u32(recomp_runtime.registers.esp + 4u);
-    if (inferno_style_test && (character == 27u || character == 28u)) {
+    if ((inferno_style_test || arcade_guest_draw) && (character == 27u || character == 28u)) {
         recomp_runtime.registers.eax = 1u;
         recomp_runtime.registers.esp += 4u;   /* the original's ret */
         return;
@@ -788,11 +789,43 @@ static uint32_t call_guest(uint32_t address, const uint32_t *args, unsigned coun
    the three, one not yet met in the run if there is one, by the game's random number (0x1B660); the outfit is chosen
    again for it as the original chooses one (0x52270: the player's character and outfit, the opponent, -1). The stage
    is the row's, whoever it is. Time Attack (mode 2) does the same with its courses (0x53890 of the fight: 4-byte rows
-   of character, level, stage): courses 4 and 6 have Spawn where the PS2's have Heihachi. */
+   of character, level, stage): courses 4 and 6 have Spawn where the PS2's have Heihachi.
+   Arcade (mode 1) draws its first six opponents from a 9-byte row by the fight (Extra Arcade's, [0x398990] set, at
+   0x1A0E27, fights 1 to 6), one not yet met that the mode (0x464E0, column 1) or the bonus fighter test (0x46550) lets
+   in. Extra Arcade's rows for fights 3 and 6 have Spawn, where the GameCube's have Link and the PS2's Heihachi.
+   With the guests loaded, Spawn's place in those draws is one of the three, one not yet met in the run and not the
+   player's (by the game's random number), and 0x46550 lets the guests in. */
 static void next_opponent(void)
 {
+    enum { EXTRA_ARCADE_ROWS = 0x1a0e27u, ROW_LENGTH = 9u };
     const uint32_t esp = recomp_runtime.registers.esp;
     const uint32_t outfit_out = *recomp_memory_u32(esp + 4u);
+    const uint32_t fight = *recomp_memory_u32(0x398b30u);
+    uint8_t *guest_place = NULL;
+    if (*(int16_t *)(void *)recomp_memory(0x39895eu, 2u) == 1 && *recomp_memory_u32(0x398990u) != 0u &&
+        (fight == 3u || fight == 6u) && (sc2_guest_loaded(27u) || sc2_guest_loaded(28u))) {
+        uint8_t *row = recomp_memory(EXTRA_ARCADE_ROWS + fight * ROW_LENGTH, ROW_LENGTH);
+        for (unsigned i = 0; i < ROW_LENGTH && guest_place == NULL; ++i)
+            if (row[i] == 29u) guest_place = row + i;
+    }
+    if (guest_place != NULL) {
+        const uint32_t player = *recomp_memory_u32(0x398a08u);
+        const uint32_t own = (uint32_t)(int32_t)*(int16_t *)(void *)recomp_memory(player + 0x58u, 2u);
+        uint32_t fresh[3];
+        unsigned n_fresh = 0;
+        for (uint32_t character = 27u; character <= 29u; ++character) {
+            if ((character != 29u && !sc2_guest_loaded(character)) || character == own) continue;
+            if (*(uint16_t *)(void *)recomp_memory(0x3bb1a8u + character * 2u, 2u) == 0u) fresh[n_fresh++] = character;
+        }
+        if (n_fresh != 0u) *guest_place = (uint8_t)fresh[call_guest(0x1b660u, NULL, 0u) % n_fresh];
+        ++arcade_guest_draw;
+        sub_00056250();
+        --arcade_guest_draw;
+        fprintf(stderr, "recomp sc2: Extra Arcade's fight %u: the guest's place %u, character %u\n", fight,
+                *guest_place, recomp_runtime.registers.eax);
+        *guest_place = 29u;
+        return;
+    }
     sub_00056250();
     const int16_t mode = *(int16_t *)(void *)recomp_memory(0x39895eu, 2u);
     if ((mode != 6 && mode != 2) || recomp_runtime.registers.eax != 29u) return;
