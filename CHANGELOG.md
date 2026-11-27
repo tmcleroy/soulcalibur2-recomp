@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+Fixes, most from players' reports: Link and Heihachi in Extra Arcade, the menus in 4:3 in widescreen, the frame
+meter while paused, a stray card on the stage select, and the stripes on Android handhelds with Qualcomm graphics.
+
 - **The frame meter holds while paused** ([#37](https://github.com/tmcleroy/soulcalibur2-recomp/issues/37)): with
   Frame data on, pausing (Start) in the middle of a move kept the meter running, and the move's startup, active or
   recovery frames came out longer by the time spent paused. The meter and the numbers now count only frames the
