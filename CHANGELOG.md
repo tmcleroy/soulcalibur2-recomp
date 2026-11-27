@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- **No spinning card on the stage select**: with the guests built, choosing the same fighter for both sides from
+  the grid's right-hand column (Raphael twice in Practice, for one) left that fighter's grid card turning beside
+  player 2's portrait on the stage select. It now slides off with the others as the grid closes.
 - **Link and Heihachi in Extra Arcade**: stages 3 and 6 of Extra Arcade can bring Spawn, where the GameCube's bring
   Link and the PlayStation 2's Heihachi, but Link and Heihachi never came up. Spawn's place in those draws is now one of
   the three, one not met yet in the run first.
