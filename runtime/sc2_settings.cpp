@@ -85,6 +85,9 @@ const std::vector<recomp::FeatureInfo> &Features()
             "The language of the game's text: menus, profiles and messages. Only the European disc (Europe, Australia) "
             "has other languages, so this is offered only with it. Takes effect when the game starts.",
             0, {"English", "Deutsch", "Fran\u00e7ais", "Espa\u00f1ol", "Italiano"}},
+        {"full_height", "Graphics", "Fill the screen's height",
+            "The picture without the Xbox's black bars at its top and bottom, its 448 lines over the whole height as "
+            "the GameCube and PS2 versions show them (a little taller). Off: as the Xbox shows it.", 0, {}},
         {"fps_counter", "Graphics", "FPS counter",
             "The frames shown each second, in the top right corner. The game runs at 60.", 0, {}},
         {"health_refill", "Training", "Health refills",
@@ -182,6 +185,7 @@ Settings LoadSettings(const std::string &path)
     for (size_t i = 0; i < features.size(); ++i) {
         if (features[i].name == "health_refill") settings.health_refill = values[i] != 0;
         else if (features[i].name == "fps_counter") settings.fps_counter = values[i] != 0;
+        else if (features[i].name == "full_height") settings.full_height = values[i] != 0;
         else if (features[i].name == "hd_textures") settings.hd_textures = values[i] != 0;
         else if (features[i].name == "texture_dump") settings.texture_dump = values[i] != 0;
         else if (features[i].name == "infinite_time") settings.infinite_time = values[i] != 0;

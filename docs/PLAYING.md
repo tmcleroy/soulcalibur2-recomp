@@ -112,6 +112,7 @@ Practice mode's own options (the dummy's guard and actions, its attack data) are
 | Resolution | Draws the game at 1x to 8x the Xbox's 640x480 (above 4x needs a fast graphics card) |
 | Shader | The picture through one of RetroArch's shaders (below); also in the in-game menu |
 | FPS counter | Frames shown each second, top right; also in the in-game menu |
+| Fill the screen's height | The picture without the Xbox's black bars at its top and bottom, over the whole height as on the GameCube and PS2 (a little taller); also in the in-game menu. Not on Windows yet |
 | Health refills, Infinite time, Input display, Combo readout, Hit boxes, Frame data | Training, as in the menu |
 | No damage (each player), One-hit knockouts | Cheats, as in the menu |
 | Ping, Input delay, Hide names | What an online match shows |

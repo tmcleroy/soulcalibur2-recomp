@@ -22,6 +22,8 @@ extern uint32_t sc2_scene_switches;
 extern uint32_t sc2_fight_steps;
 /* A press asking the movie playing to end (sc2_menu.cpp), taken by the movie scene's update */
 extern int sc2_movie_skip;
+/* Fill the screen's height: the picture without the Xbox's bars (d3d8_adapter.c) */
+extern bool sc2_full_height;
 
 /* Online play: the host's seed for the game's random numbers, used in place of the clock the game seeds them from
    (sc2_netplay.h), when sc2_net_seeded. */
