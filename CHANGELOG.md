@@ -18,7 +18,7 @@
   sides, as the game draws it; the fights stay 16:9.
 - **Android with Adreno graphics**: the screens held while the game loads (the opening's notices and the namco
   logo) could show stripes and scattered specks on phones and handhelds with Qualcomm graphics, such as the Retroid
-  Flip 2. The copy of the shown frame is now made the way the frame itself is.
+  Flip 2. On Android the shown frame is kept again only once the game reads it back, as before 0.6.
 
 ## 0.7.1-beta.1
 
