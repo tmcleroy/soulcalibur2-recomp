@@ -1396,6 +1396,7 @@ int main(int argc, char **argv)
         sc2::TrainingState().no_damage[1] = settings.no_damage[1];
         sc2::TrainingState().one_hit = settings.one_hit;
         sc2::TrainingState().fps_counter = settings.fps_counter;
+        sc2_full_height = settings.full_height;
         sc2::OnlineDisplay() = {settings.online_ping, settings.online_delay, settings.online_hide_names};
         /* (kernel_config.c: XC_LANGUAGE; the European program's alone, the US disc having English only) */
         if (SC2_PAL && std::getenv("RECOMP_XBOX_LANGUAGE") == nullptr)

@@ -76,6 +76,7 @@ int FeatureValue(const std::string &name)
     if (name == "no_damage_p2") return training.no_damage[1];
     if (name == "one_hit") return training.one_hit;
     if (name == "fps_counter") return training.fps_counter;
+    if (name == "full_height") return sc2_full_height;
     if (name == "hd_textures") return TexturesHd();
     if (name == "texture_dump") return TexturesDump();
     if (name == "shader") return shader_choice;
@@ -101,6 +102,7 @@ void SetFeatureValue(const std::string &name, int value)
     else if (name == "no_damage_p2") training.no_damage[1] = value != 0;
     else if (name == "one_hit") training.one_hit = value != 0;
     else if (name == "fps_counter") training.fps_counter = value != 0;
+    else if (name == "full_height") sc2_full_height = value != 0;
     else if (name == "hd_textures") ApplyTextures(settings_path, value != 0, TexturesDump());
     else if (name == "texture_dump") ApplyTextures(settings_path, TexturesHd(), value != 0);
     else if (name == "shader") SetShader(value);

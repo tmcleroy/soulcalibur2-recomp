@@ -18,6 +18,10 @@
   own, sold in the shops after Spawn's demonstration and shown in the Collection History beside the guest's
   profile, with its picture from the guest's disc. As on the GameCube, Link's third and fourth costumes are bought.
   Build the guests again after updating (the launcher asks).
+- **Fill the screen's height** (Graphics, also in the in-game menu): the Xbox draws the game on 448 of its 480 lines,
+  black above and below, where the GameCube and PS2 versions fill the screen with the same picture. With this on
+  the bars are gone and the picture fills the height as on those consoles (a little taller than the Xbox's). Not
+  yet on Windows.
 
 ## 0.8.0-beta.1
 

@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 #include "d3d8_adapter.h"
+#include "sc2_hooks.h"
 #include "d3d8_state_adapter.h"
 #include "d3d8_resource_adapter.h"
 #include "d3d_card_model.h"
@@ -715,6 +716,12 @@ static bool versus_screen(void)
     return step == 2 || (step == 1 && frames < 60);
 }
 
+/* Fill the screen's height (sc2_settings.cpp, full_height): the game draws its picture on 448 of the 480 lines, 16 black
+   above and below (the viewport 0,16-640,464), which the GameCube and PS2 versions show over the whole height. The
+   presenter leaves the bars off and stretches the rest (recomp_d3d_present_fill); clean view, which takes a match's
+   letterbox off its own way, goes without. */
+bool sc2_full_height;
+
 static bool scene_wide(void)
 {
     const uint32_t scene = *recomp_memory_u32(0x00398700u);
@@ -759,6 +766,7 @@ static void swap(void)
     if (!sc2_fast_forward) recomp_d3d_wait_present();
     /* (clean view, the HUD hidden: a match's letterbox left off, the picture filling the window) */
     recomp_d3d_present_crop = recomp_scene_freeze_overlay_hidden() ? letterbox_share : 0.0f;
+    recomp_d3d_present_fill = sc2_full_height && recomp_d3d_present_crop == 0.0f ? 16.0f / 480.0f : 0.0f;
     /* (a Swap that keeps the shown frame, while the game loads, keeps it at the shape it was shown at) */
     if (!result.command.data.present.keep_shown && recomp_d3d_present_narrow == recomp_d3d8_frame_wide()) {
         recomp_d3d_present_narrow = !recomp_d3d8_frame_wide();
