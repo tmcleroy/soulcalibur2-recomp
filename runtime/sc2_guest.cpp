@@ -299,10 +299,10 @@ bool GuestFileMatches(const char *path)
     const bool read = Entry(f, 0, 2, ui, size) && std::fseek(f, long(ui), SEEK_SET) == 0 && std::fread(&count, 4, 1, f) == 1;
     std::fclose(f);
     /* (the disc's /2 entries, then, in a file built since, the GameCube's and the PS2's title pictures: SetUpTitles) */
-    if (read && (count == kUiEntries || count == kUiEntries + 6u)) return true;
+    if (read && (count == kUiEntries || count == kUiEntries + 6u || count == kUiEntries + 10u)) return true;
     std::fprintf(stderr, "recomp sc2: the guests' file %s was built from %s, not this one: playing without the guests\n",
-                 path, !read ? "something else than a disc" : count == 585u || count == 591u ? "the European disc"
-                                                          : count == 516u || count == 522u ? "the US disc" : "another disc");
+                 path, !read ? "something else than a disc" : count == 585u || count == 591u || count == 595u ? "the European disc"
+                                                          : count == 516u || count == 522u || count == 526u ? "the US disc" : "another disc");
     return false;
 }
 
@@ -337,12 +337,22 @@ uint64_t TitleSource(const char *host_path, uint64_t offset, uint32_t length)
     return offset;
 }
 
+/* The Collection History's pictures of the guests' own items, after the title pictures (guest/build.cpp,
+   EXTRA_PICTURES): their /2 entries, or 0 for none (a guests' file built before them, or a hole for a disc not given) */
+uint32_t g_extra_picture[4];
+
 void SetUpTitles(std::FILE *f, uint64_t ui, const char *path)
 {
     constexpr uint32_t kTitleFirst = 12u, kTitlePictures = 3u;   /* (guest/build.h, TITLE_FIRST, TITLE_PICTURES) */
     uint32_t count = 0;
     if (std::fseek(f, long(ui), SEEK_SET) || std::fread(&count, 4, 1, f) != 1 || count < kUiEntries + 2u * kTitlePictures)
         return;   /* (a guests' file built before these) */
+    for (uint32_t k = 0; k < 4u && count >= kUiEntries + 2u * kTitlePictures + 4u; ++k) {
+        uint64_t at;
+        uint32_t size;
+        const uint32_t entry = kUiEntries + 2u * kTitlePictures + k;
+        g_extra_picture[k] = Entry(f, ui, entry, at, size) && size != 0u ? entry : 0u;
+    }
     for (uint32_t k = 0; k < kTitlePictures; ++k) {
         Title &t = g_titles[k];
         if (!Entry(f, ui, Ui(kTitleFirst + k), t.at, t.size) || t.size == 0u) continue;
@@ -489,6 +499,7 @@ bool ApplyGuestRoster(const char *path)
     }
     g_guest_loaded[0] = !profiles[0].empty();
     g_guest_loaded[1] = !profiles[1].empty();
+    if (g_guest_loaded[0] || g_guest_loaded[1]) sc2_guest_items_setup();
     g_boss_form[0] = g_guest_loaded[0] && form[0];
     g_boss_form[1] = g_guest_loaded[1] && form[1];
     return true;
@@ -521,6 +532,11 @@ extern "C" void sc2_guest_gallery_cells(uint32_t object)
     for (int g = 0; g_gallery_kept && g < 3; ++g) cells = std::max(cells, g_gallery_columns[g] * g_gallery_rows[g]);
     const uint32_t list = Get<uint32_t>(object + 0x74u);
     for (int cell = 45; list && cell < cells; ++cell) Put<uint32_t>(list + 4u * uint32_t(cell), 0u);
+}
+
+extern "C" int sc2_guest_extra_picture(unsigned which)
+{
+    return which < 4u && sc2::g_extra_picture[which] ? int(sc2::g_extra_picture[which]) : -1;
 }
 
 extern "C" int sc2_guest_loaded(uint32_t character)

@@ -1026,6 +1026,7 @@ static bool sampleInput(std::uint32_t port, RecompInputGamepad *gamepad)
             unsigned first = 0, last = 0;
             if (std::sscanf(items, "%u-%u", &first, &last) == 2 && last < 0x12cu)
                 std::memset(recomp_memory(0x3bb368u + first, last - first + 1u), 3, last - first + 1u);
+            if (std::strchr(items, 'g')) sc2_guest_items_all();   /* (FIRST-LASTg: the guests' own items too) */
         }
     const char *test_ko = std::getenv("SC2_TEST_KO");
     unsigned ko_until = 0;

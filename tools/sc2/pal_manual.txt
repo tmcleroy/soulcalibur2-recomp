@@ -62,3 +62,10 @@
 0x000fa408 0x000feb09   # the select build's return from 0xB81B0 (PAL 0xBB3D0; the one call inside PAL 0xFE700's function)
 0x0034eed0 0x00360a30   # the weapon gallery's table: PAL 0xE3100 (US 0xDF110) copies 19 rows from it, to 0x360AC8
 0x00373f58 0x00385b9c   # the vblank count (sc2_hooks.c frame_begins): written by the vblank callback alone, 0x2DA40 in US, 0x2E320 in PAL
+
+# --- the guests' demonstrations and Link's outfits (sc2_guest_items.c, the Collection History and the save's last field)
+0x000573e2 0x00058972   # the Collection History picture's return from 0x14A10 (PAL 0x14A60; add edx, 0x128 before it)
+0x00058358 0x0005990c   # the "COLLECTION DATA" counter's return from 0x28900 (PAL 0x29180; push 0x56 before it, and a text)
+0x000c4770 0x000c7d00   # the save's last field's load (the field table's last row: 1, 0x2A4, 1, PAL 0x34B678)
+0x000c5220 0x000c87b0   # ... and its save
+0x000f7b81 0x000fc1e6   # the shop help line's return from 0x56BE0 (PAL 0x58170; 0xF7BAC -> 0xFC211 is the next call's)

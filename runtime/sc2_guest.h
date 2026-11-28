@@ -60,6 +60,12 @@ int sc2_select_grid_balanced(void);
 int sc2_guest_weapon_item(uint32_t character, uint32_t weapon);
 /* Every guest's weapon had (the menu's Unlock everything) */
 void sc2_guest_items_all(void);
+/* The guests' demonstrations and Link's outfits, items of their own (sc2_guest_items.c): their state's room, once the
+   guests are loaded */
+void sc2_guest_items_setup(void);
+/* The /2 entry of a guest's Collection History picture past the title pictures (0 Link's demonstration, 1 and 2 his
+   outfits, 3 Heihachi's demonstration), or -1 in a guests' file built before them */
+int sc2_guest_extra_picture(unsigned which);
 
 /* The Art Gallery's Hi-Res pictures: 20, or more with the guests' (sc2_guest.cpp, ApplyGallery). */
 void sc2_guest_gallery_open(uint32_t object, uint32_t gallery);

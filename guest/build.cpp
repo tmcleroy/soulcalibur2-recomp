@@ -626,6 +626,10 @@ void build_guests_root(const DiscFile &xbox, const DiscFile *gamecube, const Dis
        the PS2's own (their logos and copyright lines), after the disc's /2 entries: the GameCube's three, then the
        PS2's (holes for a disc not given). The runtime shows one of the consoles' at random (sc2_guest.cpp, titles). */
     std::vector<Bytes> titles(2 * TITLE_PICTURES);
+    /* The Collection History's pictures of the guests' own items, after the title pictures (runtime/sc2_guest.cpp,
+       SetUpTitles; sc2_guest_items.c): the GameCube's /2/344-346 (its items 47-49: Link's weapon demonstration and
+       his two outfits, /2/297 + the item) and the PS2's /2/344 (its item 47, Heihachi's demonstration). */
+    std::vector<Bytes> extras(EXTRA_PICTURES);
 
     if (gamecube) try {
         const Olnk groot(gamecube->read, 0), g4 = groot.child(4), g2 = groot.child(2);
@@ -639,6 +643,8 @@ void build_guests_root(const DiscFile &xbox, const DiscFile *gamecube, const Dis
         std::vector<Bytes> ui = e2;
         guest_ui_entries(x2, g2, ui, layout);
         for (const auto &pair : LINK_OWN_UI) e2.at(layout.ui(pair[1])) = ui.at(layout.ui(pair[0]));
+        extras.at(0) = ui.at(layout.ui(344));
+        for (uint32_t k = 1; k < 3; ++k) extras.at(k) = keep_flags(convert_rgba8_bank(g2.bytes(344 + k)), x2.bytes(layout.ui(344)));
         const Bytes gicons = parts_of(g2.bytes(5), true).at(2), g9 = g2.bytes(9), g10 = parts_of(g2.bytes(10), true).at(0);
         for (uint32_t k = 0; k < 4; ++k) {
             small_new.emplace_back(entry_flags(small, 51), c8_texture(gicons, 51 + k));
@@ -669,6 +675,7 @@ void build_guests_root(const DiscFile &xbox, const DiscFile *gamecube, const Dis
         std::vector<Bytes> ui = e2;
         heihachi_ui_entries(x2, p2, ui, layout);
         for (const auto &pair : HEIHACHI_OWN_UI) e2.at(layout.ui(pair[1])) = ui.at(layout.ui(pair[0]));
+        extras.at(3) = ui.at(layout.ui(344));
         /* (the banks keep a reference to their bytes) */
         const Bytes picons_data = parts_of(p2.bytes(5), false).at(2), p9_data = p2.bytes(9),
                     p10_data = parts_of(p2.bytes(10), false).at(0);
@@ -702,6 +709,10 @@ void build_guests_root(const DiscFile &xbox, const DiscFile *gamecube, const Dis
     for (Bytes &title : titles) {
         e2.push_back(std::move(title));
         t2.push_back(t2.at(layout.ui(TITLE_FIRST)));
+    }
+    for (Bytes &extra : extras) {
+        e2.push_back(std::move(extra));
+        t2.push_back(t2.at(layout.ui(344)));
     }
     top.at(2) = build_olnk(e2, t2, x2.alignment(), x2.time());
     step();

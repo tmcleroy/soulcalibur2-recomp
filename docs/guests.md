@@ -557,6 +557,34 @@ Link and Heihachi took those, so Weapon Master's shops and the Museum's Weapon G
   (`runtime/sc2_guest_gallery.c`).
 - **Weapon Master's select**: the box (0xB81B0 from 0xFA408) is a column wider and the cells half a column left.
 
+## Their demonstrations and Link's outfits (2026-11-27, Discord reports)
+
+The Xbox's character -> weapon demonstration table (0x1A22B8, read by 0x56960) gives the guests -1, which the game
+counts as had: their demonstrations played in the Exhibition Theater from the start, and neither showed in the
+Collection History (items 0-87) nor was sold in a shop. Their own discs have them past Spawn's: the GameCube's item
+table (boot.dol at file offset 0x29BD50, rows {kind, 0, 0x500, picture} big-endian) has Link's profile 46, demonstration 47 and
+two outfits 48 and 49 (kind 4, the third and fourth costumes); the PS2's (SLUS_206.43 at file offset 0x2FF3C8) has Heihachi's
+profile 46 and demonstration 47 and no outfit.
+
+- **Items 420-423** (`runtime/sc2_guest_items.c`): Link's demonstration, Heihachi's, Link's two outfits. 0x56960
+  gives the demonstrations for 27 and 28, 0x56860 (the item a costume needs: the game's only the third) Link's
+  outfits for his costumes 2 and 3; records are built as the table's ({2 or 4, 0, 156 + ID, 0x500}).
+- **Kept in the save past its last field.** The save (0x8C630) zeroes its 16 KB, writes the field table's fields in
+  order (6648 bytes) and signs the whole buffer (0x8C740 checks it). The last field (0x346F08, 0x2A4 bytes) is written
+  by 0xC5220 and read by 0xC4770 through the table: after them two bytes, 0xA5 and the four bits, are written and
+  read, signed with the rest. A save made before has zeros there: none had. 0x565F0 (a new save) clears them.
+- **The shop**: after the row of Spawn's demonstration (47), at its price, in the order the GameCube has them; Spawn's
+  demonstration stands in for them in the shop's step and help line (0xF7B81), as the guest slot's weapons do.
+- **The Collection History** (0x580F0): 0x574F0(item, step) steps to the next had item round the list, 0x56630
+  counts the had ones, and the counter (0x28900 from 0x58353; the European program passes its format's text first)
+  printed item + 1, less 2 past 49, out of 86. The list is now the game's 0-87 (48 and 49 only with the guests'
+  profiles) with each guest's own after its profile; with both guests it has 92. The viewer loads /2/(297 + item)
+  (0x14A10 from 0x573DD; 296 on the European disc): the guests' own pictures are the guests' file's /2 entries after
+  the title pictures (`guest/build.cpp`, EXTRA_PICTURES: the GameCube's /2/344-346, the PS2's /2/344), or in a file
+  built before them (GUESTS_VERSION 7) their profiles' pictures.
+- Link's third and fourth costumes are now had as the other characters' third ones are: through the shop. The
+  in-game menu's Unlock everything gives all four.
+
 ## The European disc's effect icons and the first data region (2026-11-15, issue #77)
 
 The European program shows each weapon's effects as icons on the Extra modes' weapon choice: a bit mask at +0x3C of

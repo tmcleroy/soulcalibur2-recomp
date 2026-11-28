@@ -43,7 +43,7 @@ void build_guests_root(const DiscFile &xbox, const DiscFile *gamecube, const Dis
    noticed: the launcher asks for a rebuild, and online play compares it (two
    players need the same file). build_guests_root writes it beside the file, as
    <output>.version ("sc2-guests N"). */
-constexpr int GUESTS_VERSION = 7;
+constexpr int GUESTS_VERSION = 8;
 
 /* The version a guests' file was built with: 0 when it has no stamp (built
    before stamps, or a build that did not finish). */
@@ -52,6 +52,9 @@ int guests_version(const std::string &output);
 /* The title screen's pictures, /2/12 on (the same on every disc): the guests' file has the GameCube's and the PS2's
    after the disc's own /2 entries (TITLE_PICTURES each, the GameCube's first). */
 constexpr uint32_t TITLE_FIRST = 12, TITLE_PICTURES = 3;
+/* ... and after those, the Collection History's pictures of the guests' own items: Link's weapon demonstration and his
+   two outfits (the GameCube's /2/344-346), Heihachi's demonstration (the PS2's /2/344). */
+constexpr uint32_t EXTRA_PICTURES = 4;
 
 /* The PS2 disc's program (Soulcalibur II, USA). */
 constexpr const char *PS2_ID = "SLUS_206.43";
