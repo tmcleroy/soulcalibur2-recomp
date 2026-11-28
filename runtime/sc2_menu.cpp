@@ -225,10 +225,31 @@ void Configure()
     layout::Rows rows;
     rows.resetDescription = "Starts the game again, as if switched off and on: the window closes and opens again, "
                             "and the game reads your save as it last saved it.";
-    layout::Standard(config, rows);
-    /* (under Game, after Cheats, as satrecomp has it) */
-    config.pages.push_back({"Pictures", layout::kGame,
+    layout::Tabbed(config, rows);
+    /* (the Capture tab's: pictures taken out of the game) */
+    config.pages.push_back({"Pictures", "",
         "Export the Art Gallery's pictures as JPEG files, and show the folder they go to.", false});
+    for (recomp::MenuTab &tab : config.tabs) {
+        if (tab.name == layout::kTabCapture) tab.pages.push_back("Pictures");
+        /* (Tabbed, not knowing the page, made a row of it on the Game tab) */
+        if (tab.name == layout::kTabGame)
+            tab.rows.erase(std::remove_if(tab.rows.begin(), tab.rows.end(),
+                [](const recomp::MenuRow &row) { return row.kind == recomp::MenuRow::Page && row.title == "Pictures"; }),
+                tab.rows.end());
+    }
+    /* (an option's default, which X puts back and against which a row shows as changed: as the launcher's Enhanced
+       preset has it, as Reset all options puts it) */
+    {
+        recomp::Ini preset("");
+        recomp::SetPreset(preset, features, "enhanced");
+        std::vector<int> defaults = recomp::FeatureValues(preset, features);
+        config.defaultValue = [defaults = std::move(defaults)](size_t feature) {
+            const size_t index = menu_features[feature];
+            return index < defaults.size() ? defaults[index] : 0;
+        };
+    }
+    config.tabsName = recomp::sdl::kTabsName;
+    config.backName = recomp::sdl::kBackName;
     menu.Configure(std::move(config));
 }
 
@@ -560,6 +581,8 @@ void Run(bool scripted)
                 case 'l': pressed = recomp::kMenuLeft; break;
                 case 'r': pressed = recomp::kMenuRight; break;
                 case 'c': pressed = recomp::kMenuConfirm; break;
+                case 'q': pressed = recomp::kMenuTabPrev; break;
+                case 'e': pressed = recomp::kMenuTabNext; break;
                 case 'b': pressed = recomp::kMenuBack; break;
                 default: break;
                 }

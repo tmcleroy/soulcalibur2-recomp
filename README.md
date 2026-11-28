@@ -79,8 +79,9 @@ steps a frame; H (or Black) hides the life bars and timer; F12 saves a screensho
   lines, or your own preset.
 - **An endless battle**: in any fight, the game plays both fighters for as long as you like (touch the controls to
   take one over).
-- **An in-game menu** (Esc, F1, a gamepad's Guide or Back), laid out as the other ports': online, display, the speed,
-  sound, cheats (no damage, one-hit knockouts, everything unlocked), training mode, save states, reset and quit.
+- **An in-game menu** (Esc, F1, a gamepad's Guide or Back), in tabs, as the other ports': a row of save states,
+  reset and quit on top, and Game, Display, Sound, Online, Training, Modes, Cheats (no damage, one-hit knockouts,
+  everything unlocked) and Capture below.
 - **Android**: the launcher and the game in one app for 64-bit phones and tablets (Android 10 or later, Vulkan),
   with touch controls (a stick, the four attack buttons, Start and the menu) beside any gamepad.
 - **A launcher** that checks your disc, builds the guests, sets features and both players' keys and buttons, hosts
@@ -88,7 +89,7 @@ steps a frame; H (or Black) hides the life bars and timer; F12 saves a screensho
 
 | | |
 | --- | --- |
-| ![The launcher's Guest page](docs/screenshots/launcher-guests.png) | ![The launcher's Features page](docs/screenshots/launcher-features.png) |
+| ![The launcher's Guest page](docs/screenshots/launcher-guests.png) | ![The launcher's Settings page](docs/screenshots/launcher-features.png) |
 
 ## Getting started
 

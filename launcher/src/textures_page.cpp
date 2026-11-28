@@ -2,7 +2,7 @@
 // The Textures page: an HD texture pack made for Dolphin and the GameCube disc (GRSEAF), which the player has
 // downloaded and unzipped, made into one the game reads (guest/texture_pack.h): its images, by the map built into
 // the launcher, written to textures/GRSEAF in the player's folder, where the game looks while HD textures is on
-// (the Features page). The pack is only read.
+// (the in-game menu's Display tab). The pack is only read.
 
 #include "textures_page.h"
 
@@ -131,7 +131,7 @@ void TexturesPage(launcher::PageContext &page) {
                     "An HD texture pack made for the GameCube version in Dolphin works here too: the Xbox's textures "
                     "are the same pictures, so each of the pack's images is matched to the texture it replaces. "
                     "Download the pack yourself (Soulcalibur 2 Complete HD Textures, for GRSEAF) and unzip it; it is "
-                    "only read. Turn on HD textures (Features page, Graphics) to see it.",
+                    "only read. Turn on HD textures (the in-game menu's Display tab) to see it.",
                     page.width);
 
     const std::string pack = page.prefs.get("textures", "pack");
@@ -170,7 +170,7 @@ void TexturesPage(launcher::PageContext &page) {
 #endif
     card.end();
     ui::gap(10);
-    ui::text("Your own textures go in the textures folder too: turn on Dump textures (Features page), play, and an "
+    ui::text("Your own textures go in the textures folder too: turn on Dump textures (the in-game menu's Display tab), play, and an "
              "image saved under a dumped texture's name (a DDS, any size) takes its place.",
              ui::Font::Regular, ui::size::kDetail, p.secondary, page.width);
 }

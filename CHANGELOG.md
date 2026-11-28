@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- **The in-game menu in tabs, and the launcher to match**: Back, Save state, Load state, Slot, Reset game, Quit game
+  and Resume stay in a row at the top; every option is under a tab (Game, Display, Sound, Online, Training, Modes,
+  Cheats, Capture), changed with Q and E or LB and RB, and X (or Delete) puts an option back as the Enhanced preset
+  has it. The launcher has tabs along its top, and shows only what is set before the game starts (the resolution
+  and the European disc's language) on its Settings page; every other option is in the in-game menu.
+
 - **Select screens and galleries in their right shape**: in widescreen the character select's icons and portraits
   and the Museum's pictures came out a fifth too narrow, laid out for a 16:9 television but shown 4:3. They are now
   laid out as the game does in 4:3. In 4:3 the menus, select screens and the fights' writing came out a ninth too
