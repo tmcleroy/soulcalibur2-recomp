@@ -826,7 +826,10 @@ static uint32_t call_guest(uint32_t address, const uint32_t *args, unsigned coun
    the three, one not yet met in the run if there is one, by the game's random number (0x1B660); the outfit is chosen
    again for it as the original chooses one (0x52270: the player's character and outfit, the opponent, -1). The stage
    is the row's, whoever it is. Time Attack (mode 2) does the same with its courses (0x53890 of the fight: 4-byte rows
-   of character, level, stage): courses 4 and 6 have Spawn where the PS2's have Heihachi.
+   of character, level, stage): courses 4 and 6 have Spawn where the PS2's have Heihachi. Its fights are the same on
+   every run (the mode is raced against the clock), so there the guest is not drawn: it is Heihachi, as Soulcalibur
+   II HD Online has it, or Spawn without the PS2's disc (Link came up every time: the draw's number is the same at
+   the same point of a run).
    Arcade (mode 1) draws its first six opponents from a 9-byte row by the fight (Extra Arcade's, [0x398990] set, at
    0x1A0E27, fights 1 to 6), one not yet met that the mode (0x464E0, column 1) or the bonus fighter test (0x46550) lets
    in. Extra Arcade's rows for fights 3 and 6 have Spawn, where the GameCube's have Link and the PS2's Heihachi.
@@ -878,6 +881,18 @@ static void next_opponent(void)
         if (*(uint16_t *)(void *)recomp_memory(0x3bb1a8u + character * 2u, 2u) == 0u) fresh[n_fresh++] = character;
     }
     if (n_all < 2u) { recomp_runtime.registers.eax = 29u; return; }
+    if (mode == 2) {
+        recomp_runtime.registers.eax = sc2_guest_loaded(28u) ? 28u : 29u;
+        if (recomp_runtime.registers.eax == 28u && outfit_out != 0u) {
+            const uint32_t player = *recomp_memory_u32(0x398a08u);
+            const uint32_t outfit_args[] = {(uint32_t)(int32_t)*(int16_t *)(void *)recomp_memory(player + 0x58u, 2u),
+                (uint32_t)(int32_t)*(int16_t *)(void *)recomp_memory(player + 0x64u, 2u), 28u, 0xffffffffu};
+            *(uint16_t *)(void *)recomp_memory(outfit_out, 2u) = (uint16_t)call_guest(0x52270u, outfit_args, 4u);
+        }
+        fprintf(stderr, "recomp sc2: Time Attack's guest fight %u: character %u\n", *recomp_memory_u32(0x398b30u),
+                recomp_runtime.registers.eax);
+        return;
+    }
     const uint32_t *pool = n_fresh != 0u ? fresh : all;
     const unsigned count = n_fresh != 0u ? n_fresh : n_all;
     const uint32_t chosen = pool[call_guest(0x1b660u, NULL, 0u) % count];
