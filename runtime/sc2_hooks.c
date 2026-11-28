@@ -51,7 +51,6 @@ extern void sub_00056A00(void);
 extern void sub_00055010(void);
 extern void sub_00046550(void);
 extern void sub_00146610(void);
-extern void sub_0006A1F0(void);
 extern void sub_0006A6E0(void);
 extern void sub_00056250(void);
 extern void sub_000523A0(void);
@@ -220,44 +219,7 @@ static void cell_place(void)
     if (cell == 26u && sc2_select_grid_balanced()) *f += step;
 }
 
-/* 0x6A1F0, a select cell's setup (thiscall: ECX the cell, +0x90 its row in the grid [0x3CA00C], 36 bytes a cell,
-   the character at +0). A character of -1 is an empty cell: not drawn, and the cursors pass over it. The Museum's
-   Character Profiles (mode 15) and Character Ending (mode 16) have nothing for the bonus fighters (Lizardman,
-   Assassin, Berserker: 30-32), and showed them greyed, as if still to be unlocked; there their cells are empty, as
-   on the other consoles, and are given back for every other select (museum_grid, from here and each frame). */
-static struct { int cell; int16_t character; } museum_hidden[3];
-static int museum_hidden_count;
 
-static void museum_grid(bool hide)
-{
-    const uint32_t grid = *recomp_memory_u32(0x003CA00Cu);
-    if (!grid) return;
-    if (!hide) {
-        for (int k = 0; k < museum_hidden_count; ++k)
-            *(int16_t *)recomp_memory(grid + 36u * (uint32_t)museum_hidden[k].cell, 2u) = museum_hidden[k].character;
-        museum_hidden_count = 0;
-        return;
-    }
-    for (int cell = 0; cell < 30 && museum_hidden_count < 3; ++cell) {
-        int16_t *character = (int16_t *)recomp_memory(grid + 36u * (uint32_t)cell, 2u);
-        if (*character < 30 || *character > 32) continue;
-        museum_hidden[museum_hidden_count].cell = cell;
-        museum_hidden[museum_hidden_count++].character = *character;
-        *character = -1;
-    }
-}
-
-static bool museum_select_mode(void)
-{
-    const uint16_t mode = *(const uint16_t *)recomp_memory(0x0039895Eu, 2u);
-    return mode == 15u || mode == 16u;
-}
-
-static void cell_setup(void)
-{
-    museum_grid(museum_select_mode());
-    sub_0006A1F0();
-}
 
 /* 0x6A6E0, a select cell's frame (thiscall: ECX the cell; its state at +0x7C, its place in the grid at +0x78, its x
    offset at +0x54). As the select screen closes each card leaves (state 5, its progress at +0x60 rising by the frame
@@ -455,8 +417,10 @@ static void character_available_bonus(void)
     const uint32_t esp = recomp_runtime.registers.esp;
     const uint32_t character = *recomp_memory_u32(esp + 4u);
     const uint32_t costume = *recomp_memory_u32(esp + 8u);
-    /* In the Museum profile viewer (mode 9), they have no profiles, so leave locked. */
-    if (*(const uint16_t *)recomp_memory(0x0039895Eu, 2u) == 9u) {
+    /* The Museum's selects (the Exhibition Theater, mode 9; Character Profiles, 15; Character Ending, 16) have nothing
+       for them, and show their cells locked, the metal box, as the other consoles do. */
+    const uint16_t mode = *(const uint16_t *)recomp_memory(0x0039895Eu, 2u);
+    if (mode == 9u || mode == 15u || mode == 16u) {
         recomp_runtime.registers.eax = 0u;
         recomp_runtime.registers.esp += 4u;
         return;
@@ -757,7 +721,6 @@ enum { VBLANK_COUNT = 0x00373F58u };
 static void frame_begins(void)
 {
     ++*recomp_memory_u32(VBLANK_COUNT);
-    if (museum_hidden_count && !museum_select_mode()) museum_grid(false);   /* (the Museum's select left) */
     sc2_frame_begins();
     sub_00032630();
 }
@@ -936,7 +899,6 @@ RecompFunction recomp_sc2_hooks_lookup_manual(uint32_t address)
     case 0x000502a0u: return scene_switch;
     case 0x0002abc0u: return sprite_draw;
     case 0x0006a190u: return cell_place;
-    case 0x0006a1f0u: return cell_setup;
     case 0x0006a6e0u: return cell_frame;
     case 0x0006b000u: return cursor_move;
     case 0x000698d0u: return character_available_bonus;
