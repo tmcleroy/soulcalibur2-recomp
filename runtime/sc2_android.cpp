@@ -193,6 +193,26 @@ static void reportCrashes()
     for (int signal : {SIGSEGV, SIGBUS, SIGILL, SIGFPE, SIGABRT}) sigaction(signal, &action, nullptr);
 }
 
+static void sc2_android_on_exit()
+{
+    std::fflush(stdout);
+    std::fflush(stderr);
+    JNIEnv *env = static_cast<JNIEnv *>(SDL_GetAndroidJNIEnv());
+    if (!env) return;
+    jobject activity = static_cast<jobject>(SDL_GetAndroidActivity());
+    if (!activity) return;
+    jclass activity_class = env->GetObjectClass(activity);
+    if (activity_class) {
+        jmethodID finish_game = env->GetMethodID(activity_class, "finishGame", "(I)V");
+        if (finish_game) {
+            env->CallVoidMethod(activity, finish_game, 0);
+        }
+        if (env->ExceptionCheck()) env->ExceptionClear();
+        env->DeleteLocalRef(activity_class);
+    }
+    env->DeleteLocalRef(activity);
+}
+
 void sc2_android_start()
 {
     SDL_SetAssertionHandler(passAssertion, nullptr);
@@ -216,10 +236,11 @@ void sc2_android_start()
         dup2(file, 2);
         close(file);
         setvbuf(stdout, nullptr, _IOLBF, 0);
-        setvbuf(stderr, nullptr, _IONBF, 0);
+        setvbuf(stderr, nullptr, _IOLBF, 0);
     } else {
         toSystemLog();
     }
+    std::atexit(sc2_android_on_exit);
     reportCrashes();
     fastCores();
     recomp_host_pump_start();
@@ -261,20 +282,39 @@ bool sc2_android_start_again(const std::vector<std::string> &args)
     jobject activity = static_cast<jobject>(SDL_GetAndroidActivity());
     if (!env || !activity) return false;
     jclass activity_class = env->GetObjectClass(activity);
-    jmethodID start_again = env->GetMethodID(activity_class, "startAgain", "([Ljava/lang/String;)Z");
+    jmethodID start_again = activity_class ? env->GetMethodID(activity_class, "startAgain", "([Ljava/lang/String;)Z") : nullptr;
     if (!start_again) {
-        env->ExceptionClear();
+        if (env->ExceptionCheck()) env->ExceptionClear();
+        if (activity_class) env->DeleteLocalRef(activity_class);
+        env->DeleteLocalRef(activity);
         return false;
     }
     jclass string_class = env->FindClass("java/lang/String");
-    jobjectArray arguments = env->NewObjectArray(static_cast<jsize>(args.size()), string_class, nullptr);
+    jobjectArray arguments = string_class ? env->NewObjectArray(static_cast<jsize>(args.size()), string_class, nullptr) : nullptr;
+    if (!arguments) {
+        if (env->ExceptionCheck()) env->ExceptionClear();
+        if (string_class) env->DeleteLocalRef(string_class);
+        env->DeleteLocalRef(activity_class);
+        env->DeleteLocalRef(activity);
+        return false;
+    }
     for (size_t i = 0; i < args.size(); i++) {
         jstring arg = env->NewStringUTF(args[i].c_str());
+        if (!arg) {
+            if (env->ExceptionCheck()) env->ExceptionClear();
+            env->DeleteLocalRef(arguments);
+            env->DeleteLocalRef(string_class);
+            env->DeleteLocalRef(activity_class);
+            env->DeleteLocalRef(activity);
+            return false;
+        }
         env->SetObjectArrayElement(arguments, static_cast<jsize>(i), arg);
         env->DeleteLocalRef(arg);
     }
-    const bool started = env->CallBooleanMethod(activity, start_again, arguments);
+    const bool started = env->CallBooleanMethod(activity, start_again, arguments) != JNI_FALSE;
+    if (env->ExceptionCheck()) env->ExceptionClear();
     env->DeleteLocalRef(arguments);
+    env->DeleteLocalRef(string_class);
     env->DeleteLocalRef(activity_class);
     env->DeleteLocalRef(activity);
     return started;

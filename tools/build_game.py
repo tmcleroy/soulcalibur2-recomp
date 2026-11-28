@@ -121,6 +121,7 @@ def bound_addresses():
 
 
 def manual_list():
+    PROGRAM.mkdir(parents=True, exist_ok=True)
     path = PROGRAM / "manual_functions.json"
     entries = ["0x%08X" % a for a in bound_addresses()]
     path.write_text(json.dumps(entries, indent=0) + "\n")
@@ -130,7 +131,13 @@ def manual_list():
 def lift():
     if sha256(XBE) != XBE_SHA256:
         sys.exit("%s is not the supported Soulcalibur II %s executable" % (XBE, "(Europe, Australia)" if PAL else "(USA)"))
+    PROGRAM.mkdir(parents=True, exist_ok=True)
     logs = PRIVATE / ("logs-pal" if PAL else "logs")
+    logs.mkdir(parents=True, exist_ok=True)
+    (PROGRAM / "disasm").mkdir(parents=True, exist_ok=True)
+    (PROGRAM / "generated").mkdir(parents=True, exist_ok=True)
+    (PROGRAM / "metadata").mkdir(parents=True, exist_ok=True)
+    (PROGRAM / "none").mkdir(parents=True, exist_ok=True)
     seeds = SEEDS
     run([PYTHON, "-u", "-m", "tools.xbe_parser", XBE, "--json", PROGRAM / "analysis.json"],
         logs / "xbe-parser.log", LIFTER)
