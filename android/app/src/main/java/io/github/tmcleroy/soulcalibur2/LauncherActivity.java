@@ -34,6 +34,7 @@ public class LauncherActivity extends SDLActivity {
 
     private int nextSlot = 0;
     private volatile int result = 0;
+    private volatile String lastGameLog = null;
     private volatile String imported = "";
     private volatile long importCopiedBytes = 0;
     private volatile long importTotalBytes = 0;
@@ -148,6 +149,7 @@ public class LauncherActivity extends SDLActivity {
         intent.putExtra(GameActivity.EXTRA_ARGUMENTS, arguments);
         intent.putExtra(GameActivity.EXTRA_FOLDER, folder);
         intent.putExtra(GameActivity.EXTRA_LOG, log);
+        lastGameLog = log;
         result = STILL_RUNNING;
         runOnUiThread(() -> startActivityForResult(intent, REQUEST_GAME));
         return true;
@@ -255,7 +257,11 @@ public class LauncherActivity extends SDLActivity {
                 openInstaller(new File(path));
             }
         } else if (requestCode == REQUEST_GAME) {
-            result = resultCode >= RESULT_FIRST_USER ? resultCode - RESULT_FIRST_USER : -1;
+            int exit = resultCode >= RESULT_FIRST_USER ? resultCode - RESULT_FIRST_USER : -1;
+            if (exit != 0 && logSaysNormalExit(lastGameLog)) {
+                exit = 0;
+            }
+            result = exit;
         } else if (requestCode == REQUEST_IMPORT) {
             final List<Uri> chosen = new ArrayList<>();
             if (resultCode == RESULT_OK && data != null) {
@@ -335,5 +341,29 @@ public class LauncherActivity extends SDLActivity {
             return null;
         }
         return to.getPath();
+    }
+
+    private static boolean logSaysNormalExit(String logPath) {
+        if (logPath == null || logPath.isEmpty()) {
+            return false;
+        }
+        File file = new File(logPath);
+        if (!file.isFile()) {
+            return false;
+        }
+        boolean normalExit = false;
+        try (java.io.BufferedReader reader = new java.io.BufferedReader(
+                new java.io.InputStreamReader(new java.io.FileInputStream(file), java.nio.charset.StandardCharsets.UTF_8))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                if (line.contains("recomp stop: ")) {
+                    normalExit = line.contains("kind=normal-exit") || line.contains("exit_code=0");
+                }
+            }
+        } catch (Exception e) {
+            Log.w("soulcalibur2", "could not read game log " + logPath + ": " + e);
+            return false;
+        }
+        return normalExit;
     }
 }

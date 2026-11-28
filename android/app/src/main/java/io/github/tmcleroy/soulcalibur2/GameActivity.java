@@ -44,6 +44,7 @@ public class GameActivity extends SDLActivity {
         } catch (ErrnoException e) {
             Log.w("soulcalibur2", "setenv: " + e);
         }
+        setResult(RESULT_FIRST_USER);
         super.onCreate(savedInstanceState);
     }
 
@@ -172,6 +173,11 @@ public class GameActivity extends SDLActivity {
             }
         }
         return Slot0.class;
+    }
+
+    public void finishGame(int code) {
+        setResult(RESULT_FIRST_USER + code);
+        finish();
     }
 
     @Override
