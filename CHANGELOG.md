@@ -25,6 +25,9 @@
 - **Extra Time Attack's guest is Heihachi**: the guest's fight in Extra Time Attack (stage 6 of Standard, and the
   Extreme course's) was drawn between Spawn, Link and Heihachi, and the draw came out Link every run. The mode's fights
   are set, to race the clock, so it is now Heihachi, as in Soulcalibur II HD Online (Spawn without the PS2's disc).
+- **The bonus fighters locked in the Museum's selects**: Lizardman, Assassin and Berserker have no profile and no
+  ending; Character Profiles' and Character Ending's selects left their cells empty. They now show the metal locked
+  box there, as in the Exhibition Theater and on the other consoles.
 
 ## 0.8.0-beta.1
 
