@@ -22,6 +22,9 @@
   black above and below, where the GameCube and PS2 versions fill the screen with the same picture. With this on
   the bars are gone and the picture fills the height as on those consoles (a little taller than the Xbox's). Not
   yet on Windows.
+- **Extra Time Attack's guest is Heihachi**: the guest's fight in Extra Time Attack (stage 6 of Standard, and the
+  Extreme course's) was drawn between Spawn, Link and Heihachi, and the draw came out Link every run. The mode's fights
+  are set, to race the clock, so it is now Heihachi, as in Soulcalibur II HD Online (Spawn without the PS2's disc).
 
 ## 0.8.0-beta.1
 
