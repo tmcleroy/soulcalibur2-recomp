@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased
+
+- **Select screens and galleries in their right shape**: in widescreen the character select's icons and portraits
+  and the Museum's pictures came out a fifth too narrow, laid out for a 16:9 television but shown 4:3. They are now
+  laid out as the game does in 4:3. In 4:3 the menus, select screens and the fights' writing came out a ninth too
+  flat, with a black band under them: the game draws them shorter for the Xbox to stretch to the whole picture,
+  and now they are.
+- **The versus screen in 4:3**: in widescreen the screen before each fight, with the two fighters facing each other,
+  was stretched across the 16:9 picture. It is now shown 4:3 like the select screens, through its fade into the
+  stage; the fight itself stays 16:9.
+- **The subtitles' bar in widescreen**: the see-through bar behind the fights' subtitles had gaps near its ends.
+  It now runs whole from edge to edge.
+
 ## 0.8.0-beta.1
 
 Fixes, most from players' reports: Link and Heihachi in Extra Arcade, the menus in 4:3 in widescreen, the frame
