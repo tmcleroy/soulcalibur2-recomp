@@ -361,6 +361,11 @@ Still to do:
   Heihachi, never available on the Xbox, fail both tests, so they never came up. In those two draws Spawn's place is
   one of the three, one not yet met and not the player's, and 0x46550 answers yes for the guests while the draw runs
   (`next_opponent`).
+- Music: the GameCube's bgm.afs has two tracks the Xbox's lacks, 65 (3.5 s) and 66 (the Legend of Zelda theme,
+  102 s, ADX at 32 kHz with a loop); the Xbox's tracks from 65 on are the GameCube's from 67. The GameCube's music
+  start (0x8007E660, the Xbox's 0xF0360) plays track 66 in Link's fights by mode (runtime/sc2_guest_music.c has the
+  table); the guests' file carries the track (guest/build.h, LINK_THEME_TRACK) and the hook plays it from guest
+  memory with ADXT_StartMem2 (0x10C930) in place of ADXT_StartAfs.
 - Team Battle (mode 4 of 0x56250, 0x56150) takes the computer's team from 8-byte rows of three characters and a
   used flag: 16 at 0x1A1CC0 (Extra's 13 at 0x1A1D48) for fights 1 to 4, 4 at 0x1A1DB8 (0x1A1DE0) for the last, the
   row kept by fight at 0x3BAFD8. Rows 15 and 16, Extra's 12 and the last fight's 4th have Spawn where the GameCube's

@@ -630,6 +630,7 @@ void build_guests_root(const DiscFile &xbox, const DiscFile *gamecube, const Dis
        SetUpTitles; sc2_guest_items.c): the GameCube's /2/344-346 (its items 47-49: Link's weapon demonstration and
        his two outfits, /2/297 + the item) and the PS2's /2/344 (its item 47, Heihachi's demonstration). */
     std::vector<Bytes> extras(EXTRA_PICTURES);
+    Bytes link_theme;
 
     if (gamecube) try {
         const Olnk groot(gamecube->read, 0), g4 = groot.child(4), g2 = groot.child(2);
@@ -658,6 +659,11 @@ void build_guests_root(const DiscFile &xbox, const DiscFile *gamecube, const Dis
         for (uint32_t k = 0; k < TITLE_PICTURES; ++k) {
             const Bytes x = x2.bytes(layout.ui(TITLE_FIRST + k));
             titles.at(k) = keep_flags(paletted_bank({{entry_flags(x, 0), c8_texture(g2.bytes(TITLE_FIRST + k), 0)}}), x);
+        }
+        if (gamecube->music) {
+            link_theme = gamecube->music(LINK_THEME_TRACK);
+            if (link_theme.size() < 0x20 || link_theme[0] != 0x80 || link_theme[1] != 0x00)
+                throw Error("the GameCube disc's bgm.afs track " + std::to_string(LINK_THEME_TRACK) + " is not an ADX stream");
         }
         step();
     } catch (const std::exception &e) {
@@ -714,6 +720,8 @@ void build_guests_root(const DiscFile &xbox, const DiscFile *gamecube, const Dis
         e2.push_back(std::move(extra));
         t2.push_back(t2.at(layout.ui(344)));
     }
+    e2.push_back(std::move(link_theme));
+    t2.push_back(t2.at(layout.ui(344)));
     top.at(2) = build_olnk(e2, t2, x2.alignment(), x2.time());
     step();
     const std::string stamp = output + ".version";

@@ -762,6 +762,7 @@ RecompFunction sc2_wm_select_lookup(uint32_t address);
 /* The guests' weapons as items of their own (sc2_guest_items.c) */
 RecompFunction sc2_guest_items_lookup(uint32_t address);
 RecompFunction sc2_records_lookup(uint32_t address);
+RecompFunction sc2_guest_music_lookup(uint32_t address);
 /* ... and their rows in the Museum's weapon gallery (sc2_guest_gallery.c) */
 RecompFunction sc2_guest_gallery_lookup(uint32_t address);
 
@@ -985,6 +986,8 @@ RecompFunction recomp_sc2_hooks_lookup_manual(uint32_t address)
     if (items) return items;
     const RecompFunction records = sc2_records_lookup(address);
     if (records) return records;
+    const RecompFunction music = sc2_guest_music_lookup(address);
+    if (music) return music;
     const RecompFunction gallery = sc2_guest_gallery_lookup(address);
     return gallery ? gallery : sc2_wm_select_lookup(address);
 }
