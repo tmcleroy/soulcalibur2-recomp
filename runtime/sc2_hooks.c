@@ -31,7 +31,6 @@ extern void sub_0002EC90(void);
 extern void sub_000569B0(void);
 extern void sub_00032630(void);
 extern void sub_000566F0(void);
-extern void sub_000C4940(void);
 extern void sub_00036A70(void);
 extern void sub_00036A40(void);
 extern void sub_000F1390(void);
@@ -460,16 +459,6 @@ static void weapon_item(void)
     }
 }
 
-/* 0xC4940(records, slot, character), thiscall: counts a play of the character in the records (the count at +8 + its
-   roster place x 0x1C, the place also kept at +0x2B8 + slot x 4). The guests have no place (-1), so the count it
-   raised was a dword 0x14 bytes before the records. Their plays count as Spawn's, the guest slot's. */
-static void play_counted(void)
-{
-    uint32_t *character = recomp_memory_u32(recomp_runtime.registers.esp + 8u);
-    if (*character == 27u || *character == 28u) *character = 29u;
-    sub_000C4940();
-}
-
 /* 0x569F0 (character in eax): the character's own item (its roster place + 0x116), which the game checks
    (0x56690) and sets (0x57680): clearing Arcade gets it, and with it had the Museum's Character Ending shows the
    character's ending. With no place the guests had item 277, another's; they take Spawn's. The bonus fighters
@@ -507,7 +496,8 @@ static void character_ending(void)
    character's place, -1 for the guests before; 0x36A40(place) the character at a place (above 23: the 24th's). The
    records keep a character as its place in a byte (0xC53A0, 0xC5A20, 0xC5FF0: Arcade, Survival and the others, 0xFF
    for none), so with places of their own a guest's records name them. Where a place indexes a 24-entry array the
-   guests keep Spawn's (play counts 0xC4940, own item 0x569F0, weapons 0x566F0, above) or none (0xF1390, below). */
+   guests keep Spawn's (own item 0x569F0, weapons 0x566F0, above) or none (0xF1390, below); the Records have
+   entries of their own for them (sc2_records.c). */
 enum { GUEST_PLACE = 24u };
 static void roster_place(void)
 {
@@ -771,6 +761,7 @@ static void leave_for_dashboard(void)
 RecompFunction sc2_wm_select_lookup(uint32_t address);
 /* The guests' weapons as items of their own (sc2_guest_items.c) */
 RecompFunction sc2_guest_items_lookup(uint32_t address);
+RecompFunction sc2_records_lookup(uint32_t address);
 /* ... and their rows in the Museum's weapon gallery (sc2_guest_gallery.c) */
 RecompFunction sc2_guest_gallery_lookup(uint32_t address);
 
@@ -959,7 +950,6 @@ RecompFunction recomp_sc2_hooks_lookup_manual(uint32_t address)
     case 0x0006b000u: return cursor_move;
     case 0x000698d0u: return character_available_bonus;
     case 0x000566f0u: return weapon_item;
-    case 0x000c4940u: return play_counted;
     case 0x00036a70u: return roster_place;
     case 0x00036a40u: return roster_character;
     case 0x000f1390u: return character_float;
@@ -993,6 +983,8 @@ RecompFunction recomp_sc2_hooks_lookup_manual(uint32_t address)
     }
     const RecompFunction items = sc2_guest_items_lookup(address);
     if (items) return items;
+    const RecompFunction records = sc2_records_lookup(address);
+    if (records) return records;
     const RecompFunction gallery = sc2_guest_gallery_lookup(address);
     return gallery ? gallery : sc2_wm_select_lookup(address);
 }

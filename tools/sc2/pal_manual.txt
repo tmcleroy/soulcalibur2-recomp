@@ -68,4 +68,5 @@
 0x00058358 0x0005990c   # the "COLLECTION DATA" counter's return from 0x28900 (PAL 0x29180; push 0x56 before it, and a text)
 0x000c4770 0x000c7d00   # the save's last field's load (the field table's last row: 1, 0x2A4, 1, PAL 0x34B678)
 0x000c5220 0x000c87b0   # ... and its save
+0x000c3070 0x000c65f0   # the Records list setup (sc2_records.c, list_set_up): the same code, 0x3580 on, as its neighbours are
 0x000f7b81 0x000fc1e6   # the shop help line's return from 0x56BE0 (PAL 0x58170; 0xF7BAC -> 0xFC211 is the next call's)

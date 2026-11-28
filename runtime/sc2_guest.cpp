@@ -499,7 +499,10 @@ bool ApplyGuestRoster(const char *path)
     }
     g_guest_loaded[0] = !profiles[0].empty();
     g_guest_loaded[1] = !profiles[1].empty();
-    if (g_guest_loaded[0] || g_guest_loaded[1]) sc2_guest_items_setup();
+    if (g_guest_loaded[0] || g_guest_loaded[1]) {
+        sc2_guest_items_setup();
+        sc2_records_setup();
+    }
     g_boss_form[0] = g_guest_loaded[0] && form[0];
     g_boss_form[1] = g_guest_loaded[1] && form[1];
     return true;

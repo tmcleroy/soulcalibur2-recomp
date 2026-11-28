@@ -63,6 +63,12 @@ void sc2_guest_items_all(void);
 /* The guests' demonstrations and Link's outfits, items of their own (sc2_guest_items.c): their state's room, once the
    guests are loaded */
 void sc2_guest_items_setup(void);
+/* The guests' entries in the Records (sc2_records.c): their room, once the guests are loaded; and in the save, after
+   the items' bytes (SC2_RECORDS_SAVE_BYTES there) */
+void sc2_records_setup(void);
+enum { SC2_RECORDS_SAVE_BYTES = 1 + 2 * 0x1C };
+void sc2_records_save(uint8_t *at);
+void sc2_records_load(const uint8_t *at);
 /* The /2 entry of a guest's Collection History picture past the title pictures (0 Link's demonstration, 1 and 2 his
    outfits, 3 Heihachi's demonstration), or -1 in a guests' file built before them */
 int sc2_guest_extra_picture(unsigned which);

@@ -215,7 +215,7 @@ row), Link's three and Heihachi's two illustrations in Illustrations (a tenth co
 their own versions of the two black-and-white pictures with Soul Edge and Soul Calibur.
 
 Clearing Arcade with a guest unlocks their profile, as with everyone (after a Rebuild on the Guest page, for a
-guests' file built before 2026-11-01). Their other records and unlocks are the guest slot's (Spawn's). How the conversion works is in [guests.md](guests.md).
+guests' file built before 2026-11-01). They have their own rows in the Records; their other unlocks are the guest slot's (Spawn's). How the conversion works is in [guests.md](guests.md).
 
 ## Online play
 

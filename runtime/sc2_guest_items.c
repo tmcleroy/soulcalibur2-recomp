@@ -457,9 +457,10 @@ static void save_last_field(void)
     const uint32_t at = *recomp_memory_u32(recomp_runtime.registers.esp + 4u) + 0x2A4u;
     sub_000C5220();
     if (extra_at == 0u) return;
-    uint8_t *after = recomp_memory(at, 2u);
+    uint8_t *after = recomp_memory(at, 2u + SC2_RECORDS_SAVE_BYTES);
     after[0] = SAVE_MARK;
     after[1] = *recomp_memory(extra_at, 1u);
+    sc2_records_save(after + 2);
 }
 
 static void load_last_field(void)
@@ -467,8 +468,9 @@ static void load_last_field(void)
     const uint32_t at = *recomp_memory_u32(recomp_runtime.registers.esp + 4u) + 0x2A4u;
     sub_000C4770();
     if (extra_at == 0u) return;
-    const uint8_t *after = recomp_memory(at, 2u);
+    const uint8_t *after = recomp_memory(at, 2u + SC2_RECORDS_SAVE_BYTES);
     *recomp_memory(extra_at, 1u) = after[0] == SAVE_MARK ? (uint8_t)(after[1] & 0x0Fu) : 0u;
+    sc2_records_load(after + 2);
 }
 
 /* 0x565F0: a new save's items, none had */

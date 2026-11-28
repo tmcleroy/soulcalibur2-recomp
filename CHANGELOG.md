@@ -25,6 +25,9 @@
 - **Extra Time Attack's guest is Heihachi**: the guest's fight in Extra Time Attack (stage 6 of Standard, and the
   Extreme course's) was drawn between Spawn, Link and Heihachi, and the draw came out Link every run. The mode's fights
   are set, to race the clock, so it is now Heihachi, as in Soulcalibur II HD Online (Spawn without the PS2's disc).
+- **Link and Heihachi in the Records**: the Records' character usage page ranked the 24 characters of the Xbox's
+  roster, and the guests' plays were counted as Spawn's. They now have records of their own, ranked on the usage
+  and win ratio pages with everyone else, and kept in the save (records from before count as Spawn's, as they were).
 - **The guests' loading picture**: while a guest's fight or profile loads, the picture shown was the Raphael, Talim
   and Yunsung one, which the game shows for anyone it has no picture for. They now have the black-and-white
   Soulcalibur II picture, the guest slot's, as Link has on the GameCube.
