@@ -361,6 +361,12 @@ Still to do:
   Heihachi, never available on the Xbox, fail both tests, so they never came up. In those two draws Spawn's place is
   one of the three, one not yet met and not the player's, and 0x46550 answers yes for the guests while the draw runs
   (`next_opponent`).
+- Team Battle (mode 4 of 0x56250, 0x56150) takes the computer's team from 8-byte rows of three characters and a
+  used flag: 16 at 0x1A1CC0 (Extra's 13 at 0x1A1D48) for fights 1 to 4, 4 at 0x1A1DB8 (0x1A1DE0) for the last, the
+  row kept by fight at 0x3BAFD8. Rows 15 and 16, Extra's 12 and the last fight's 4th have Spawn where the GameCube's
+  rows have Link and the PS2's Heihachi (their other rows differ a little too). Each member is set by 0x53B40, and
+  from the team pick (return 0x5623C) Spawn's place is drawn from the guests and Spawn, kept for that fight and row
+  (`team_member_set`).
 - Practice's Command List and Show Move work for both (their move names and
   inputs from their own discs), and both come up as the computer's opponents in
   Extra Survival's guest battles, in either outfit, Link's bombs and all.

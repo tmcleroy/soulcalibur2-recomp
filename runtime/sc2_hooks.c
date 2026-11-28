@@ -54,6 +54,7 @@ extern void sub_00146610(void);
 extern void sub_0006A6E0(void);
 extern void sub_00056250(void);
 extern void sub_000523A0(void);
+extern void sub_00053B40(void);
 /* memmove (0x146610; memcpy calls it too): the C library's, copied natively. Its last bytes go through small jump
    tables, and on the European disc (0x14B810) the lift lost the arm for none left (the table at 0x14BAA8 reads from
    -7 to 0 and slot 0 was not found), so a copy ending on a whole dword stopped the game ("unresolved indirect call
@@ -888,9 +889,51 @@ static void survival_draw_allowed(void)
     sub_000523A0();
 }
 
+/* 0x53B40(fighter, place, character, outfit, 0): one member of a Team Battle team (+0x4120 + place x 8). The mode's
+   computer teams (mode 4, 0x56150 of the fight) are 8-byte rows of three characters and a used flag: 16 at 0x1A1CC0
+   (Extra: 13 at 0x1A1D48) for fights 1 to 4, 4 at 0x1A1DB8 (0x1A1DE0) for the last, each outfit drawn from the
+   character's (0x47080). Rows 15 and 16, Extra's 12 and the last fight's 4th have Spawn (29), the guest slot, where
+   the GameCube's rows have Link (27) and the PS2's Heihachi (28); with the guests loaded they were never met there.
+   There Spawn's place is one of the three loaded, by the game's random number (0x1B660), with an outfit of its own.
+   The team is set again each time the fight's opponent is asked for (the row kept by fight at 0x3BAFD8), so the draw
+   is kept for that fight, row and place: the versus screen and the fight show the same team. */
+static void team_member_set(void)
+{
+    static struct { uint32_t key, character, outfit; } kept[3];
+    const uint32_t esp = recomp_runtime.registers.esp;
+    uint32_t *character = recomp_memory_u32(esp + 12u);
+    const uint32_t place = *recomp_memory_u32(esp + 8u);
+    if (*recomp_memory_u32(esp) == 0x0005623Cu && *character == 29u && place < 3u &&
+        (sc2_guest_loaded(27u) || sc2_guest_loaded(28u))) {
+        const uint32_t fight = *recomp_memory_u32(0x398b30u);
+        const uint32_t row = (uint16_t)*(int16_t *)(void *)recomp_memory(0x3bafd8u + (fight < 5u ? fight : 5u) * 2u, 2u);
+        const uint32_t key = 0x80000000u | fight << 16 | row;
+        if (kept[place].key != key) {
+            uint32_t pool[3];
+            unsigned n = 0;
+            for (uint32_t c = 27u; c <= 29u; ++c)
+                if (c == 29u || sc2_guest_loaded(c)) pool[n++] = c;
+            kept[place].key = key;
+            kept[place].character = pool[call_guest(0x1b660u, NULL, 0u) % n];
+            kept[place].outfit = *recomp_memory_u32(esp + 16u);
+            if (kept[place].character != 29u) {
+                const uint32_t outfit_args[] = {kept[place].character};
+                const uint32_t outfits = call_guest(0x47080u, outfit_args, 1u);
+                kept[place].outfit = outfits != 0u ? call_guest(0x1b660u, NULL, 0u) % outfits : 0u;
+            }
+        }
+        *character = kept[place].character;
+        *recomp_memory_u32(esp + 16u) = kept[place].outfit;
+        fprintf(stderr, "recomp sc2: Team Battle's guest place %u: character %u outfit %u\n",
+                *recomp_memory_u32(esp + 8u), *character, *recomp_memory_u32(esp + 16u));
+    }
+    sub_00053B40();
+}
+
 RecompFunction recomp_sc2_hooks_lookup_manual(uint32_t address)
 {
     switch (address) {
+    case 0x00053b40u: return team_member_set;
     case 0x00056250u: return next_opponent;
     case 0x000523a0u: return survival_draw_allowed;
     case 0x00090280u: return movie_scene_update;
