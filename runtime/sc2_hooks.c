@@ -55,6 +55,7 @@ extern void sub_0006A6E0(void);
 extern void sub_00056250(void);
 extern void sub_000523A0(void);
 extern void sub_00053B40(void);
+extern void sub_000594D0(void);
 /* memmove (0x146610; memcpy calls it too): the C library's, copied natively. Its last bytes go through small jump
    tables, and on the European disc (0x14B810) the lift lost the arm for none left (the table at 0x14BAA8 reads from
    -7 to 0 and slot 0 was not found), so a copy ending on a whole dword stopped the game ("unresolved indirect call
@@ -930,10 +931,22 @@ static void team_member_set(void)
     sub_00053B40();
 }
 
+/* 0x594D0(character in EAX): the picture (/3) shown while a mode's fight or a profile loads, by character: one of seven
+   group pictures, the default (0x1F8: Raphael, Talim and Yunsung) for any it has no row for. The guests were past its
+   table and came out with the default. On the GameCube Link's shows the black-and-white Soul Edge picture, which here
+   is the guest slot's (Spawn's, 0x1FD): the guests now have the guest slot's. */
+static void loading_picture(void)
+{
+    const uint32_t character = recomp_runtime.registers.eax;
+    if (character == 27u || character == 28u) recomp_runtime.registers.eax = 29u;
+    sub_000594D0();
+}
+
 RecompFunction recomp_sc2_hooks_lookup_manual(uint32_t address)
 {
     switch (address) {
     case 0x00053b40u: return team_member_set;
+    case 0x000594d0u: return loading_picture;
     case 0x00056250u: return next_opponent;
     case 0x000523a0u: return survival_draw_allowed;
     case 0x00090280u: return movie_scene_update;

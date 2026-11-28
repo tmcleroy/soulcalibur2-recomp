@@ -25,6 +25,9 @@
 - **Extra Time Attack's guest is Heihachi**: the guest's fight in Extra Time Attack (stage 6 of Standard, and the
   Extreme course's) was drawn between Spawn, Link and Heihachi, and the draw came out Link every run. The mode's fights
   are set, to race the clock, so it is now Heihachi, as in Soulcalibur II HD Online (Spawn without the PS2's disc).
+- **The guests' loading picture**: while a guest's fight or profile loads, the picture shown was the Raphael, Talim
+  and Yunsung one, which the game shows for anyone it has no picture for. They now have the black-and-white
+  Soulcalibur II picture, the guest slot's, as Link has on the GameCube.
 - **Link and Heihachi in Team Battle**: the computer's teams in Team Battle and Extra Team Battle never had a guest.
   The rows that have Spawn are the rows where the GameCube's teams have Link and the PS2's have Heihachi; with the
   guests built, Spawn's place in those teams is now Link, Heihachi or Spawn.
