@@ -15,13 +15,41 @@
 #include <inttypes.h>
 
 #include <math.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#ifndef _WIN32
+#if !defined(_WIN32)
 #include <dlfcn.h>
 #include <execinfo.h>
+#include <time.h>
 #endif
+
+static uint64_t draw_prep_accum_ns;
+
+static inline uint64_t draw_prep_now_ns(void)
+{
+#if !defined(_WIN32) && defined(CLOCK_MONOTONIC)
+    struct timespec ts;
+    if (clock_gettime(CLOCK_MONOTONIC, &ts) == 0) {
+        return (uint64_t)ts.tv_sec * 1000000000ull + (uint64_t)ts.tv_nsec;
+    }
+#endif
+    return 0ull;
+}
+
+uint64_t sc2_d3d8_take_draw_prep_ns(void);
+
+uint64_t sc2_d3d8_take_draw_prep_ns(void)
+{
+#if defined(__GNUC__) || defined(__clang__)
+    return __atomic_exchange_n(&draw_prep_accum_ns, 0ull, __ATOMIC_RELAXED);
+#else
+    const uint64_t v = draw_prep_accum_ns;
+    draw_prep_accum_ns = 0ull;
+    return v;
+#endif
+}
 
 /* Soulcalibur II draw entry points, D3D8 5455. DOA2U's draw adapter at SC2's
    5455 offsets and addresses (tools/sc2/port_d3d.py); comments that name code
@@ -282,9 +310,13 @@ static bool widescreen_2d(const RecompD3dVertexLayout *layout, RecompD3dPresente
 static void multiply(const float left[16], const float right[16], float result[16], const char *site)
 {
     for (uint32_t row = 0u; row < 4u; ++row) {
+        const float l0 = left[row * 4u + 0u];
+        const float l1 = left[row * 4u + 1u];
+        const float l2 = left[row * 4u + 2u];
+        const float l3 = left[row * 4u + 3u];
         for (uint32_t column = 0u; column < 4u; ++column) {
-            float value = 0.0f;
-            for (uint32_t k = 0u; k < 4u; ++k) value += left[row * 4u + k] * right[k * 4u + column];
+            const float value = l0 * right[column] + l1 * right[4u + column] +
+                l2 * right[8u + column] + l3 * right[12u + column];
             if (!isfinite(value)) {
                 uint32_t bad_left = 0u, bad_right = 0u;
                 for (uint32_t i = 0u; i < 16u; ++i) {
@@ -299,23 +331,77 @@ static void multiply(const float left[16], const float right[16], float result[1
     }
 }
 
-static void attach_texture(uint32_t device, uint32_t stage, RecompD3dPresenterDrawCommand *draw)
+typedef struct DrawTextureBinding {
+    RecompD3dTextureDesc texture;
+    const void *texture_bytes;
+    uint32_t texture_byte_count;
+    const void *palette_bytes;
+    uint32_t palette_byte_count;
+    uint32_t address_u;
+    uint32_t address_v;
+    uint32_t address_w;
+    bool has_texture;
+    bool texture_is_backbuffer;
+    bool texture_is_front_buffer;
+} DrawTextureBinding;
+
+typedef struct DrawScratchBuffer {
+    uint8_t *data;
+    size_t capacity;
+} DrawScratchBuffer;
+
+static DrawScratchBuffer scratch_indices;
+static DrawScratchBuffer scratch_expanded_indices;
+static DrawScratchBuffer scratch_vertices;
+static DrawScratchBuffer scratch_extra;
+
+static void *scratch_alloc(DrawScratchBuffer *buf, size_t size, const char *tag)
+{
+    if (size == 0u) return NULL;
+    if (size > buf->capacity) {
+        size_t new_cap = buf->capacity ? buf->capacity : 4096u;
+        while (new_cap < size) {
+            if (new_cap > SIZE_MAX / 2u) {
+                new_cap = size;
+                break;
+            }
+            new_cap *= 2u;
+        }
+        uint8_t *resized = realloc(buf->data, new_cap);
+        if (resized == NULL) recomp_stop(2, "%s", tag);
+        buf->data = resized;
+        buf->capacity = new_cap;
+    }
+    return buf->data;
+}
+
+static bool verbose_d3d_log(void)
+{
+    static int enabled = -1;
+    if (enabled < 0) {
+        const char *value = getenv("RECOMP_VERBOSE_D3D_LOG");
+        enabled = (value != NULL && strcmp(value, "1") == 0) ? 1 : 0;
+    }
+    return enabled != 0;
+}
+
+static void attach_texture_binding(uint32_t device, uint32_t stage, uint32_t fvf, DrawTextureBinding *out)
 {
     const uint32_t resource = *recomp_memory_u32(device + 0xb68u + stage * 4u);
-    if (!recomp_d3d8_resource_inline_texture(stage, &draw->texture)) {
+    if (!recomp_d3d8_resource_inline_texture(stage, &out->texture)) {
         if (resource == 0u) return;
-        if (!recomp_d3d8_resource_describe(resource, &draw->texture)) {
+        if (!recomp_d3d8_resource_describe(resource, &out->texture)) {
             const uint32_t common = *recomp_memory_u32(resource), type = common & 0x70000u;
             const uint32_t format = type == 0x40000u || type == 0x50000u ?
                 *recomp_memory_u32(resource + 12u) : 0u;
             recomp_stop(2, "d3d8:draw-texture-description:stage=%u:resource=%08x:common=%08x:format=%08x:fvf=%x:ret=%08x",
-                stage, resource, common, format, draw->fvf, *recomp_memory_u32(recomp_runtime.registers.esp));
+                stage, resource, common, format, fvf, *recomp_memory_u32(recomp_runtime.registers.esp));
         }
     }
-    if (draw->texture.depth)
+    if (out->texture.depth)
         recomp_stop(2, "d3d8:draw-texture-description:depth:stage=%u:resource=%08x:fvf=%x:ret=%08x",
-            stage, resource, draw->fvf, *recomp_memory_u32(recomp_runtime.registers.esp));
-    const RecompD3dTextureDesc *desc = &draw->texture;
+            stage, resource, fvf, *recomp_memory_u32(recomp_runtime.registers.esp));
+    const RecompD3dTextureDesc *desc = &out->texture;
     if (desc->volume_depth != 0u && stage != 0u)
         recomp_stop(2, "d3d8:volume-texture-stage:%u", stage);
     uint64_t bytes = recomp_d3d_texture_compressed_mip_span(desc);
@@ -327,27 +413,45 @@ static void attach_texture(uint32_t device, uint32_t stage, RecompD3dPresenterDr
     uint32_t address;
     if (!recomp_d3d_texture_resolve_cpu_address(desc->data, &address))
         recomp_stop(2, "d3d8:draw-texture-address");
-    draw->texture_bytes = recomp_memory(address, (size_t)bytes);
-    draw->texture_byte_count = (uint32_t)bytes;
-    draw->has_texture = true;
-    draw->address_u = *recomp_memory_u32(STAGES + stage * 128u);
-    draw->address_v = *recomp_memory_u32(STAGES + stage * 128u + 4u);
-    draw->address_w = *recomp_memory_u32(STAGES + stage * 128u + 8u);
+    out->texture_bytes = recomp_memory(address, (size_t)bytes);
+    out->texture_byte_count = (uint32_t)bytes;
+    out->has_texture = true;
+    out->address_u = *recomp_memory_u32(STAGES + stage * 128u);
+    out->address_v = *recomp_memory_u32(STAGES + stage * 128u + 4u);
+    out->address_w = *recomp_memory_u32(STAGES + stage * 128u + 8u);
     if (desc->format_byte == RECOMP_D3D_TEXTURE_FORMAT_P8) {
         const uint32_t palette = *recomp_memory_u32(device + 0xb78u + stage * 4u);
         if (palette == 0u) recomp_stop(2, "d3d8:draw-missing-palette");
         if (!recomp_d3d_texture_resolve_cpu_address(*recomp_memory_u32(palette + 4u), &address))
             recomp_stop(2, "d3d8:draw-palette-address");
-        draw->palette_bytes = recomp_memory(address, 1024u);
-        draw->palette_byte_count = 1024u;
+        out->palette_bytes = recomp_memory(address, 1024u);
+        out->palette_byte_count = 1024u;
     }
     for (uint32_t slot = 0u; slot < 2u; ++slot) {
         const uint32_t header = device + 0x1604u + slot * 24u;
         if ((*recomp_memory_u32(header + 4u) & 0x7fffffffu) == (desc->data & 0x7fffffffu)) {
-            draw->texture_is_backbuffer = true;
-            draw->texture_is_front_buffer = slot == 1u;
+            out->texture_is_backbuffer = true;
+            out->texture_is_front_buffer = slot == 1u;
         }
     }
+}
+
+static void attach_texture(uint32_t device, uint32_t stage, RecompD3dPresenterDrawCommand *draw)
+{
+    DrawTextureBinding binding = {0};
+    attach_texture_binding(device, stage, draw->fvf, &binding);
+    if (!binding.has_texture) return;
+    draw->texture = binding.texture;
+    draw->texture_bytes = binding.texture_bytes;
+    draw->texture_byte_count = binding.texture_byte_count;
+    draw->has_texture = true;
+    draw->address_u = binding.address_u;
+    draw->address_v = binding.address_v;
+    draw->address_w = binding.address_w;
+    draw->palette_bytes = binding.palette_bytes;
+    draw->palette_byte_count = binding.palette_byte_count;
+    draw->texture_is_backbuffer = binding.texture_is_backbuffer;
+    draw->texture_is_front_buffer = binding.texture_is_front_buffer;
 }
 
 static bool four_tap(uint32_t device, RecompD3dPresenterDrawCommand *draw)
@@ -529,8 +633,8 @@ static bool distortion_shader(uint32_t device)
    UV3) pack into four float2 sets: UV0, tc1.st, (tc1.r, tc2.s), tc2.tr. */
 static uint8_t *distortion(uint32_t device, uint32_t stride, RecompD3dPresenterDrawCommand *draw)
 {
-    RecompD3dPresenterDrawCommand scene = {0};
-    attach_texture(device, 2u, &scene);
+    DrawTextureBinding scene = {0};
+    attach_texture_binding(device, 2u, draw->fvf, &scene);
     if (stride != 56u || !draw->has_texture || !scene.has_texture || draw->palette_bytes != NULL ||
         scene.palette_bytes != NULL || draw->texture.linear)
         recomp_stop(2, "d3d8:distortion-inputs");
@@ -550,8 +654,7 @@ static uint8_t *distortion(uint32_t device, uint32_t stride, RecompD3dPresenterD
     draw->mip_lod_bias = lod_bias(*recomp_memory_u32(STAGES + 256u + 24u));
     draw->texture_is_backbuffer = scene.texture_is_backbuffer;
     draw->texture_is_front_buffer = scene.texture_is_front_buffer;
-    float *packed = malloc((size_t)draw->vertex_count * 48u);
-    if (packed == NULL) recomp_stop(2, "d3d8:draw-index-allocation");
+    float *packed = scratch_alloc(&scratch_vertices, (size_t)draw->vertex_count * 48u, "d3d8:draw-index-allocation");
     for (uint32_t i = 0u; i < draw->vertex_count; ++i)
         memcpy(packed + i * 12u, (const uint8_t *)draw->vertex_bytes + i * 56u, 48u);
     draw->vertex_bytes = packed;
@@ -617,8 +720,8 @@ static void bump_stages(uint32_t device, bool water, RecompD3dPresenterDrawComma
     const bool has_map = draw->has_texture && draw->palette_bytes == NULL;
     draw->has_texture = draw->texture_is_backbuffer = draw->texture_is_front_buffer = false;
     attach_texture(device, first, draw);
-    RecompD3dPresenterDrawCommand mask = {0};
-    attach_texture(device, 3u, &mask);
+    DrawTextureBinding mask = {0};
+    attach_texture_binding(device, 3u, draw->fvf, &mask);
     bool admitted = has_map && draw->has_texture && mask.has_texture && map.format_byte == 0x28u &&
         !map.linear && map.bits_per_pixel == 16u && !mask.texture.linear &&
         draw->palette_bytes == NULL && mask.palette_bytes == NULL && stage[0][10] == 0xe0000000u;
@@ -973,8 +1076,8 @@ static bool attach_reflection(uint32_t device, const RecompD3dVertexLayout *layo
        writes a stage-0 bias alone). shortcut: MAXMIPLEVEL needs a sampler MinLOD. */
     if (stages[0][7] != 0u || stages[1][7] != 0u)
         recomp_stop(2, "d3d8:reflection-sampler:maxmip=%u,%u", stages[0][7], stages[1][7]);
-    RecompD3dPresenterDrawCommand texture = {0};
-    attach_texture(device, 1u, &texture);
+    DrawTextureBinding texture = {0};
+    attach_texture_binding(device, 1u, draw->fvf, &texture);
     if (!texture.has_texture || texture.texture.linear || texture.palette_bytes != NULL ||
         texture.texture.format_byte == RECOMP_D3D_TEXTURE_FORMAT_A8)
         recomp_stop(2, "d3d8:reflection-texture");
@@ -999,8 +1102,8 @@ static bool attach_reflection(uint32_t device, const RecompD3dVertexLayout *layo
     draw->reflection_alpha_kill = stages[1][11] == 4u;
     draw->reflection_stage2 = stages[2][12] == 14u;
     if (draw->reflection_stage2) {
-        RecompD3dPresenterDrawCommand third = {0};
-        attach_texture(device, 2u, &third);
+        DrawTextureBinding third = {0};
+        attach_texture_binding(device, 2u, draw->fvf, &third);
         if (!third.has_texture || third.texture.linear || third.palette_bytes != NULL ||
             third.texture.format_byte == RECOMP_D3D_TEXTURE_FORMAT_A8)
             recomp_stop(2, "d3d8:reflection-stage2-layout");
@@ -1039,8 +1142,8 @@ static bool attach_reflection(uint32_t device, const RecompD3dVertexLayout *layo
 static void stage1_mask(uint32_t device, const RecompD3dVertexLayout *layout, uint32_t stage[][32],
     bool kill_only, RecompD3dPresenterDrawCommand *draw)
 {
-    RecompD3dPresenterDrawCommand mask = {0};
-    attach_texture(device, 1u, &mask);
+    DrawTextureBinding mask = {0};
+    attach_texture_binding(device, 1u, draw->fvf, &mask);
     if (!mask.has_texture) return;
     if ((kill_only ? layout->texcoord_count == 0u || stage[1][28] != 0u
                    : layout->texcoord_count != 2u || stage[1][28] != 1u) ||
@@ -1234,24 +1337,65 @@ static bool fixed_stages(uint32_t device, const RecompD3dVertexLayout *layout,
 static uint32_t declaration_layout(uint32_t object, bool program);
 static uint32_t program_remap[16];
 
+typedef struct {
+    bool active;
+    uint32_t count;
+    struct { uint32_t stream, offset, size; } part[8];
+} GatherPlan;
+static GatherPlan gather;
+
 static void attach_program(uint32_t device, RecompD3dPresenterDrawCommand *draw)
 {
     const uint32_t handle = draw->fvf;
     uint32_t words[0x114u / 4u];
     recomp_guest_load(words, handle - 1u, sizeof words);
-    /* The declaration's registers in FVF order, gathered from its streams
-       when needed (declaration_fvf); the program reads v0, v2, v3, v9-v12. */
-    const uint32_t fvf = declaration_layout(handle - 1u, true);
-    if (words[3] > 680u || !recomp_d3d_unpack_vertex_program(
-            (const uint32_t *)(const void *)recomp_memory(handle - 1u + 0x114u, words[3] * 4u),
-            words[3], words[2], draw->program))
+    if (words[2] > 136u || words[3] > 680u)
         recomp_stop(2, "d3d8:vertex-program-unsupported:%08x", handle);
-    /* Inputs read their remapped registers (declaration_layout). */
-    for (uint32_t i = 0u; i < words[2]; ++i) {
-        const uint32_t a = draw->program[i][1], attribute = (a >> 9) & 15u;
-        draw->program[i][1] = (a & ~(15u << 9)) | program_remap[attribute] << 9;
+    const uint32_t *bytecode =
+        (const uint32_t *)(const void *)recomp_memory(handle - 1u + 0x114u, words[3] * 4u);
+
+    typedef struct {
+        uint32_t handle;
+        uint32_t words[0x114u / 4u];
+        uint32_t bytecode[680u];
+        uint32_t fvf;
+        GatherPlan gather;
+        uint32_t program_count;
+        uint32_t program[136u][4u];
+    } AttachProgramCacheEntry;
+    enum { ATTACH_CACHE_SLOTS = 16u };
+    static AttachProgramCacheEntry attach_cache[ATTACH_CACHE_SLOTS];
+    AttachProgramCacheEntry *entry = &attach_cache[(handle ^ (handle >> 6u)) & (ATTACH_CACHE_SLOTS - 1u)];
+
+    uint32_t fvf;
+    if (entry->handle == handle &&
+        memcmp(words, entry->words, sizeof words) == 0 &&
+        memcmp(bytecode, entry->bytecode, (size_t)words[3] * 4u) == 0) {
+        fvf = entry->fvf;
+        gather = entry->gather;
+        draw->program_count = entry->program_count;
+        memcpy(draw->program, entry->program, (size_t)entry->program_count * sizeof draw->program[0]);
+    } else {
+        /* The declaration's registers in FVF order, gathered from its streams
+           when needed (declaration_fvf); the program reads v0, v2, v3, v9-v12. */
+        fvf = declaration_layout(handle - 1u, true);
+        if (!recomp_d3d_unpack_vertex_program(bytecode, words[3], words[2], draw->program))
+            recomp_stop(2, "d3d8:vertex-program-unsupported:%08x", handle);
+        /* Inputs read their remapped registers (declaration_layout). */
+        for (uint32_t i = 0u; i < words[2]; ++i) {
+            const uint32_t a = draw->program[i][1], attribute = (a >> 9) & 15u;
+            draw->program[i][1] = (a & ~(15u << 9)) | program_remap[attribute] << 9;
+        }
+        draw->program_count = words[2];
+
+        entry->handle = handle;
+        memcpy(entry->words, words, sizeof words);
+        memcpy(entry->bytecode, bytecode, (size_t)words[3] * 4u);
+        entry->fvf = fvf;
+        entry->gather = gather;
+        entry->program_count = words[2];
+        memcpy(entry->program, draw->program, (size_t)words[2] * sizeof draw->program[0]);
     }
-    draw->program_count = words[2];
     recomp_guest_load(draw->program_constants, 0x0015d570u, sizeof draw->program_constants);
     RecompD3dViewport viewport;
     float scale[2], framebuffer[2], offset[2], depth;
@@ -1315,8 +1459,8 @@ static void program_stages(uint32_t device, RecompD3dPresenterDrawCommand *draw)
             args[0][1], args[0][3], args[0][4], args[0][5], args[1][0], stage[2][12], pixel,
             draw->program_count);
     if (draw->program_alpha_mask) {
-        RecompD3dPresenterDrawCommand mask = {0};
-        attach_texture(device, 1u, &mask);
+        DrawTextureBinding mask = {0};
+        attach_texture_binding(device, 1u, draw->fvf, &mask);
         if (mask.palette_bytes != NULL) recomp_stop(2, "d3d8:vertex-program-mask-palette");
         draw->reflection_texture = mask.texture;
         draw->reflection_bytes = mask.texture_bytes;
@@ -1363,8 +1507,7 @@ static uint8_t *widen_lines(bool transformed, RecompD3dPresenterDrawCommand *dra
        XYZ|DIFFUSE lines use the presenter's clip-space expansion instead. */
     const uint32_t lines = draw->index_count / 2u, stride = draw->vertex_stride;
     if (transformed || lines > 16384u) recomp_stop(2, "d3d8:draw-wide-lines:%u", lines);
-    uint8_t *storage = malloc((size_t)lines * (12u + 4u * stride));
-    if (storage == NULL) recomp_stop(2, "d3d8:draw-index-allocation");
+    uint8_t *storage = scratch_alloc(&scratch_extra, (size_t)lines * (12u + 4u * stride), "d3d8:draw-index-allocation");
     uint16_t *indices = (uint16_t *)(void *)storage;
     uint8_t *quads = storage + (size_t)lines * 12u;
     const uint16_t *source = draw->index_bytes;
@@ -1469,8 +1612,7 @@ static uint8_t *point_sprites(uint32_t device, const RecompD3dVertexLayout *layo
         recomp_stop(2, "d3d8:point-sprite-projection");
     const float width = draw->viewport[2], height = draw->viewport[3];
     typedef struct { float x, y, z; uint32_t diffuse; float u, v; } Corner;
-    uint8_t *storage = malloc((size_t)points * (12u + 4u * sizeof(Corner)));
-    if (storage == NULL) recomp_stop(2, "d3d8:draw-index-allocation");
+    uint8_t *storage = scratch_alloc(&scratch_extra, (size_t)points * (12u + 4u * sizeof(Corner)), "d3d8:draw-index-allocation");
     uint16_t *indices = (uint16_t *)(void *)storage;
     Corner *corners = (Corner *)(void *)(storage + (size_t)points * 12u);
     const uint16_t *source = draw->index_bytes;
@@ -1532,12 +1674,8 @@ enum { VSDT_NONE = 0x02u, VSDT_FLOAT2 = 0x22u, VSDT_FLOAT3 = 0x32u, VSDT_D3DCOLO
 
 /* How to build FVF-ordered vertices from a declaration's streams, when they
    are not already laid out as that FVF in stream 0 (SC2's models keep
-   position and normal in stream 0, diffuse and UV in stream 1). */
-static struct {
-    bool active;
-    uint32_t count;
-    struct { uint32_t stream, offset, size; } part[8];
-} gather;
+   position and normal in stream 0, diffuse and UV in stream 1).
+   `gather` is declared above attach_program. */
 static uint32_t gather_first;   /* the draw's first vertex index in the streams */
 /* SetModelView's model view while a composite overrides the device transforms. */
 static bool model_view_active;
@@ -1625,8 +1763,7 @@ static uint32_t declaration_fvf(uint32_t object)
 /* FVF-ordered copies of the vertices first..first+count-1 from the streams. */
 static uint8_t *gather_vertices(uint32_t first, uint32_t count, uint32_t stride)
 {
-    uint8_t *out = malloc((size_t)stride * count);
-    if (out == NULL) recomp_stop(2, "d3d8:gather-allocation");
+    uint8_t *out = scratch_alloc(&scratch_vertices, (size_t)stride * count, "d3d8:gather-allocation");
     uint32_t at = 0u;
     for (uint32_t p = 0u; p < gather.count; ++p) {
         const uint32_t slot = STREAMS + gather.part[p].stream * 12u;
@@ -1634,11 +1771,20 @@ static uint8_t *gather_vertices(uint32_t first, uint32_t count, uint32_t stride)
         uint32_t base;
         if (buffer == 0u || !recomp_d3d_texture_resolve_cpu_address(*recomp_memory_u32(buffer + 4u), &base))
             recomp_stop(2, "d3d8:gather-stream:%u", gather.part[p].stream);
+        const uint32_t part_size = gather.part[p].size;
         const uint8_t *source = recomp_memory(base + (uint64_t)first * step + gather.part[p].offset,
-            (size_t)(count - 1u) * step + gather.part[p].size);
-        for (uint32_t v = 0u; v < count; ++v)
-            memcpy(out + (size_t)v * stride + at, source + (size_t)v * step, gather.part[p].size);
-        at += gather.part[p].size;
+            (size_t)(count - 1u) * step + part_size);
+        uint8_t *dst = out + at;
+        if (part_size == 12u) {
+            for (uint32_t v = 0u; v < count; ++v, dst += stride, source += step) memcpy(dst, source, 12u);
+        } else if (part_size == 8u) {
+            for (uint32_t v = 0u; v < count; ++v, dst += stride, source += step) memcpy(dst, source, 8u);
+        } else if (part_size == 4u) {
+            for (uint32_t v = 0u; v < count; ++v, dst += stride, source += step) memcpy(dst, source, 4u);
+        } else {
+            for (uint32_t v = 0u; v < count; ++v, dst += stride, source += step) memcpy(dst, source, part_size);
+        }
+        at += part_size;
     }
     return out;
 }
@@ -1663,8 +1809,22 @@ static bool bind_stage_texture(uint32_t device, uint32_t i, const uint32_t *stat
     const RecompD3dVertexLayout *layout, RecompD3dPresenterDrawCommand *draw)
 {
     RecompD3dPixelProgram *program = &draw->pixel_program;
-    RecompD3dPresenterDrawCommand texture = {0};
-    attach_texture(device, i, &texture);
+    DrawTextureBinding texture = {0};
+    if (i == 0u) {
+        texture.has_texture = draw->has_texture;
+        texture.texture = draw->texture;
+        texture.texture_bytes = draw->texture_bytes;
+        texture.texture_byte_count = draw->texture_byte_count;
+        texture.palette_bytes = draw->palette_bytes;
+        texture.palette_byte_count = draw->palette_byte_count;
+        texture.address_u = draw->address_u;
+        texture.address_v = draw->address_v;
+        texture.address_w = draw->address_w;
+        texture.texture_is_backbuffer = draw->texture_is_backbuffer;
+        texture.texture_is_front_buffer = draw->texture_is_front_buffer;
+    } else {
+        attach_texture_binding(device, i, draw->fvf, &texture);
+    }
     if (!texture.has_texture) return false;
     if (texture.texture_is_backbuffer || texture.texture.volume_depth != 0u)
         recomp_stop(2, "d3d8:general-texture-kind:stage=%u", i);
@@ -1705,12 +1865,29 @@ static bool bind_stage_texture(uint32_t device, uint32_t i, const uint32_t *stat
     return true;
 }
 
-static void color_constant(uint32_t argb, float *out)
+static inline void color_constant(uint32_t argb, float *out)
 {
-    out[0] = ((argb >> 16u) & 255u) / 255.0f;
-    out[1] = ((argb >> 8u) & 255u) / 255.0f;
-    out[2] = (argb & 255u) / 255.0f;
-    out[3] = (argb >> 24u) / 255.0f;
+    const float inv = 1.0f / 255.0f;
+    out[0] = (float)((argb >> 16u) & 255u) * inv;
+    out[1] = (float)((argb >> 8u) & 255u) * inv;
+    out[2] = (float)(argb & 255u) * inv;
+    out[3] = (float)(argb >> 24u) * inv;
+}
+
+static bool pixel_program_validated_cached(const RecompD3dPixelProgram *program, const char **reason)
+{
+    static bool cache_valid;
+    static RecompD3dPixelProgram cache_key;
+    const size_t key_bytes = offsetof(RecompD3dPixelProgram, constants);
+    if (cache_valid && memcmp(program, &cache_key, key_bytes) == 0) {
+        return true;
+    }
+    if (!recomp_d3d_pixel_program_supported(program, reason)) {
+        return false;
+    }
+    memcpy(&cache_key, program, key_bytes);
+    cache_valid = true;
+    return true;
 }
 
 /* SC2's pixel-shader draws go to the general pixel program as register
@@ -1746,18 +1923,17 @@ static void general_combiners(uint32_t device, const RecompD3dVertexLayout *layo
     /* Fog is off on these draws (submit_draw stops otherwise): factor one. */
     color_constant(*recomp_memory_u32(0x0015e5b8u), program->constants[RECOMP_D3D_PIXEL_CONSTANT_FOG]);
     program->constants[RECOMP_D3D_PIXEL_CONSTANT_FOG][3] = 1.0f;
-    uint32_t stage[4][32];
-    recomp_guest_load(stage, STAGES, sizeof stage);
     for (uint32_t i = 0u; i < RECOMP_D3D_PIXEL_STAGES; ++i) {
+        const uint32_t *state = (const uint32_t *)(const void *)recomp_memory(STAGES + i * 128u, 128u);
         RecompD3dPixelStage *out = &program->stages[i];
         const uint32_t mode = (c->texture_modes >> (i * 5u)) & 31u;
         /* Fixed-function vertices feed stage i from its TEXCOORDINDEX set. */
-        out->texcoord = (draw->fvf & 1u) ? i : (stage[i][28] & 0xffffu);
-        out->alpha_kill = stage[i][11] == 4u;
-        if (mode == 1u) out->sampled = bind_stage_texture(device, i, stage[i], out->texcoord, layout, draw);
+        out->texcoord = (draw->fvf & 1u) ? i : (state[28] & 0xffffu);
+        out->alpha_kill = state[11] == 4u;
+        if (mode == 1u) out->sampled = bind_stage_texture(device, i, state, out->texcoord, layout, draw);
     }
     const char *reason;
-    if (!recomp_d3d_pixel_program_supported(program, &reason))
+    if (!pixel_program_validated_cached(program, &reason))
         recomp_stop(2, "d3d8:general-combiners:%s:count=%u:modes=%05x:compare=%x", reason,
             c->control & 0xffu, c->texture_modes, c->compare_mode);
 }
@@ -1840,7 +2016,8 @@ static void general_lighting(uint32_t device, const RecompD3dVertexLayout *layou
         *recomp_memory_u32(RS_LIGHTING) == 0u) return;
     if (layout->blend_weight_count != 0u) recomp_stop(2, "d3d8:general-lighting-blend:fvf=%x", draw->fvf);
     if (*recomp_memory_u32(0x0015e5c4u) != 0u) recomp_stop(2, "d3d8:general-lighting-two-sided");
-    RecompD3dDirectionalLighting result = {0};
+    RecompD3dDirectionalLighting *result = &draw->directional;
+    memset(result, 0, sizeof *result);
     float material[17];
     recomp_guest_load(material, device + 0xae0u, sizeof material);
     const bool specular = *recomp_memory_u32(RS_SPECULAR_ENABLE) != 0u;
@@ -1855,14 +2032,14 @@ static void general_lighting(uint32_t device, const RecompD3dVertexLayout *layou
             if (specular && source != 0u) recomp_stop(2, "d3d8:general-lighting-specular-source:%u", source);
             continue;
         }
-        result.sources[i - 1u] = source == 1u && diffuse ? 1.0f : 0.0f;
+        result->sources[i - 1u] = source == 1u && diffuse ? 1.0f : 0.0f;
     }
     for (uint32_t i = 0u; i < 17u; ++i)
         if (!isfinite(material[i])) recomp_stop(2, "d3d8:general-lighting-material:%u", i);
-    memcpy(result.material_diffuse, material, sizeof result.material_diffuse);
-    memcpy(result.material_ambient, material + 4u, 3u * sizeof(float));
-    memcpy(result.material_emissive, material + 12u, 3u * sizeof(float));
-    color_constant(*recomp_memory_u32(0x0015e55cu), result.global_ambient);
+    memcpy(result->material_diffuse, material, sizeof result->material_diffuse);
+    memcpy(result->material_ambient, material + 4u, 3u * sizeof(float));
+    memcpy(result->material_emissive, material + 12u, 3u * sizeof(float));
+    color_constant(*recomp_memory_u32(0x0015e55cu), result->global_ambient);
     const uint32_t array = *recomp_memory_u32(device + 0x38cu), capacity = *recomp_memory_u32(device + 0x390u);
     for (uint32_t slot = 0u; slot < 8u; ++slot) {
         const uint32_t address = *recomp_memory_u32(device + 0x394u + slot * 4u);
@@ -1874,20 +2051,20 @@ static void general_lighting(uint32_t device, const RecompD3dVertexLayout *layou
         const RecompD3dLightDesc *light = &record.desc;
         if (light->type != 1u && light->type != 3u) recomp_stop(2, "d3d8:general-lighting-type:%u", light->type);
         const bool point = light->type == 1u;
-        const uint32_t i = result.count++;
+        const uint32_t i = result->count++;
         for (uint32_t c = 0u; c < 3u; ++c) {
-            result.colors[i][c] = light->diffuse[c];
-            result.ambient[i][c] = light->ambient[c];
-            result.specular[i][c] = specular ? light->specular[c] * material[8u + c] : 0.0f;
-            result.positions[i][c] = point ? light->position[c] : 0.0f;
-            result.directions[i][c] = point ? 0.0f : record.normalized_direction[c];
-            result.attenuation[i][c] = point ? light->attenuation[c] : 0.0f;
+            result->colors[i][c] = light->diffuse[c];
+            result->ambient[i][c] = light->ambient[c];
+            result->specular[i][c] = specular ? light->specular[c] * material[8u + c] : 0.0f;
+            result->positions[i][c] = point ? light->position[c] : 0.0f;
+            result->directions[i][c] = point ? 0.0f : record.normalized_direction[c];
+            result->attenuation[i][c] = point ? light->attenuation[c] : 0.0f;
         }
-        result.positions[i][3] = point;
-        result.attenuation[i][3] = point ? light->range : 0.0f;
+        result->positions[i][3] = point;
+        result->attenuation[i][3] = point ? light->range : 0.0f;
         for (uint32_t c = 0u; c < 3u; ++c)
-            if (!isfinite(result.colors[i][c]) || !isfinite(result.ambient[i][c]) ||
-                !isfinite(result.specular[i][c]) || !isfinite(result.directions[i][c]))
+            if (!isfinite(result->colors[i][c]) || !isfinite(result->ambient[i][c]) ||
+                !isfinite(result->specular[i][c]) || !isfinite(result->directions[i][c]))
                 recomp_stop(2, "d3d8:general-lighting-light:%u", slot);
     }
     float view[16];
@@ -1895,29 +2072,28 @@ static void general_lighting(uint32_t device, const RecompD3dVertexLayout *layou
     if (model_view_active) {
         float inverse[16];
         if (!affine_inverse(view, inverse)) recomp_stop(2, "d3d8:general-lighting-view");
-        multiply(model_view, inverse, result.world_transforms[0], "lighting-world");
+        multiply(model_view, inverse, result->world_transforms[0], "lighting-world");
     } else {
-        recomp_guest_load(result.world_transforms[0], device + 0x9c0u, 64u);
+        recomp_guest_load(result->world_transforms[0], device + 0x9c0u, 64u);
     }
-    if (!recomp_d3d_normal_transform(result.world_transforms[0], result.normal_transforms[0]))
-        memset(result.normal_transforms[0], 0, sizeof result.normal_transforms[0]);
+    if (!recomp_d3d_normal_transform(result->world_transforms[0], result->normal_transforms[0]))
+        memset(result->normal_transforms[0], 0, sizeof result->normal_transforms[0]);
     if (specular && *recomp_memory_u32(0x0015e530u) != 0u) {
         /* LOCALVIEWER: the eye's world position, the inverse view's origin. */
         float inverse[16];
         if (!affine_inverse(view, inverse)) recomp_stop(2, "d3d8:general-lighting-view");
-        memcpy(result.view, inverse + 12u, 3u * sizeof(float));
-        result.sources[3] = 1.0f;
-        result.view[3] = material[16] > 0.0f ? material[16] : 1e-6f;
+        memcpy(result->view, inverse + 12u, 3u * sizeof(float));
+        result->sources[3] = 1.0f;
+        result->view[3] = material[16] > 0.0f ? material[16] : 1e-6f;
     } else if (specular) {
         const float length = sqrtf(view[2] * view[2] + view[6] * view[6] + view[10] * view[10]);
         if (!isfinite(length) || length <= 0.0f) recomp_stop(2, "d3d8:general-lighting-view-direction");
-        for (uint32_t c = 0u; c < 3u; ++c) result.view[c] = -view[2u + 4u * c] / length;
+        for (uint32_t c = 0u; c < 3u; ++c) result->view[c] = -view[2u + 4u * c] / length;
         /* shortcut: zero power uses epsilon, as attach_lighting does. */
-        result.view[3] = material[16] > 0.0f ? material[16] : 1e-6f;
+        result->view[3] = material[16] > 0.0f ? material[16] : 1e-6f;
     }
-    result.normalize = *recomp_memory_u32(0x0015e5c8u) != 0u;
-    result.enabled = true;
-    draw->directional = result;
+    result->normalize = *recomp_memory_u32(0x0015e5c8u) != 0u;
+    result->enabled = true;
 }
 
 /* SC2's fixed-function draws go to the general pixel program: the SDK's
@@ -1928,8 +2104,6 @@ static void general_lighting(uint32_t device, const RecompD3dVertexLayout *layou
 static void general_fixed_stages(uint32_t device, const RecompD3dVertexLayout *layout,
     RecompD3dPresenterDrawCommand *draw, bool program_draw)
 {
-    uint32_t stage[4][32];
-    recomp_guest_load(stage, STAGES, sizeof stage);
     /* Lighting is general_lighting's; vertex specular in the FVF is not an input yet. */
     if (!program_draw && *recomp_memory_u32(RS_SPECULAR_ENABLE) != 0u &&
         layout->specular_offset != RECOMP_D3D_FVF_ABSENT)
@@ -1937,12 +2111,9 @@ static void general_fixed_stages(uint32_t device, const RecompD3dVertexLayout *l
     RecompD3dPixelProgram *program = &draw->pixel_program;
     program->specular_add = *recomp_memory_u32(RS_SPECULAR_ENABLE) != 0u;
     program->kind = RECOMP_D3D_PIXEL_FIXED_FUNCTION;
-    const uint32_t factor = draw->texture_factor;
-    const float rgba[4] = {((factor >> 16u) & 255u) / 255.0f, ((factor >> 8u) & 255u) / 255.0f,
-        (factor & 255u) / 255.0f, (factor >> 24u) / 255.0f};
-    memcpy(program->constants[RECOMP_D3D_PIXEL_CONSTANT_TFACTOR], rgba, sizeof rgba);
+    color_constant(draw->texture_factor, program->constants[RECOMP_D3D_PIXEL_CONSTANT_TFACTOR]);
     for (uint32_t i = 0u; i < RECOMP_D3D_PIXEL_STAGES; ++i) {
-        const uint32_t *state = stage[i];
+        const uint32_t *state = (const uint32_t *)(const void *)recomp_memory(STAGES + i * 128u, 128u);
         if (state[12] == RECOMP_D3DTOP_DISABLE) break;
         RecompD3dPixelStage *out = &program->stages[i];
         out->color_op = state[12];
@@ -1963,8 +2134,8 @@ static void general_fixed_stages(uint32_t device, const RecompD3dVertexLayout *l
         program->stage_count = i + 1u;
     }
     const char *reason;
-    if (!recomp_d3d_pixel_program_supported(program, &reason)) {
-        const uint32_t *first = stage[0];
+    if (!pixel_program_validated_cached(program, &reason)) {
+        const uint32_t *first = (const uint32_t *)(const void *)recomp_memory(STAGES, 128u);
         recomp_stop(2, "d3d8:general-stages:%s:%u:%u,%u,%u/%u,%u,%u:result=%u:tci=%08x:ttf=%u", reason,
             program->stage_count, first[12], first[14], first[15], first[16], first[18], first[19],
             first[20], first[28], first[21]);
@@ -2156,18 +2327,43 @@ static void composite_clip(uint32_t device, float out[16])
         !(zscale > 0.0f))
         recomp_stop(2, "d3d8:composite-viewport:%u,%u:%g,%g:%g", viewport.width, viewport.height,
             scale[0], scale[1], zscale);
-    const float mapping[16] = {
-        2.0f / (scale[0] * viewport.width), 0.0f, 0.0f, 0.0f,
-        0.0f, -2.0f / (scale[1] * viewport.height), 0.0f, 0.0f,
-        0.0f, 0.0f, 1.0f / zscale, 0.0f,
-        -1.0f, 1.0f, 0.0f, 1.0f,
-    };
-    multiply(model_composite, mapping, out, "composite");
+    const float sx = 2.0f / (scale[0] * viewport.width);
+    const float sy = -2.0f / (scale[1] * viewport.height);
+    const float sz = 1.0f / zscale;
+    for (uint32_t row = 0u; row < 4u; ++row) {
+        const float c0 = model_composite[row * 4u + 0u];
+        const float c1 = model_composite[row * 4u + 1u];
+        const float c2 = model_composite[row * 4u + 2u];
+        const float c3 = model_composite[row * 4u + 3u];
+        out[row * 4u + 0u] = c0 * sx - c3;
+        out[row * 4u + 1u] = c1 * sy + c3;
+        out[row * 4u + 2u] = c2 * sz;
+        out[row * 4u + 3u] = c3;
+        for (uint32_t col = 0u; col < 4u; ++col) {
+            if (!isfinite(out[row * 4u + col])) {
+                recomp_stop(2, "d3d8:nonfinite-transform:composite:cell=%u:left=0:right=0:ret=%08x",
+                    row * 4u + col, *recomp_memory_u32(recomp_runtime.registers.esp));
+            }
+        }
+    }
+}
+
+static const uint16_t *sequential_index_table(void)
+{
+    static uint16_t table[65536];
+    static bool initialized;
+    if (!initialized) {
+        for (uint32_t i = 0u; i < 65536u; ++i) table[i] = (uint16_t)i;
+        initialized = true;
+    }
+    return table;
 }
 
 static void submit_draw(uint32_t primitive, uint32_t count, uint32_t vertices,
     uint32_t stride, uint32_t index_address)
 {
+    const bool sample_prep_clock = (draw_submitted & 7u) == 0u;
+    const uint64_t prep_t0 = sample_prep_clock ? draw_prep_now_ns() : 0ull;
     const uint32_t device = recomp_d3d8_require_device();
     const bool quads = primitive == 8u;
     if (quads) count &= ~3u;
@@ -2185,8 +2381,26 @@ static void submit_draw(uint32_t primitive, uint32_t count, uint32_t vertices,
     if (!points && !quads && !line_strip && primitive != 2u && (primitive < 5u || primitive > 7u))
         recomp_stop(2, "d3d8:draw-primitive:%u", primitive);
     if (triangles == 0u) return;
-    RecompD3dPresenterCommand command = {0};
+    RecompD3dPresenterCommand command;
+    const size_t zero_head = offsetof(RecompD3dPresenterCommand, data.draw.program);
+    const size_t mask_start = offsetof(RecompD3dPresenterCommand, data.draw.program_alpha_mask);
+    const size_t dir_start = offsetof(RecompD3dPresenterCommand, data.draw.directional);
+    const size_t after_dir = offsetof(RecompD3dPresenterCommand, data.draw.vertex_bytes);
+    const size_t refl_mats_start = offsetof(RecompD3dPresenterCommand, data.draw.reflection_world_view);
+    const size_t refl_stage2_start = offsetof(RecompD3dPresenterCommand, data.draw.reflection_stage2);
+    const size_t refl_stage2_tf_start = offsetof(RecompD3dPresenterCommand, data.draw.reflection_stage2_transform);
+    const size_t pixel_prog_start = offsetof(RecompD3dPresenterCommand, data.draw.pixel_program);
+    memset(&command, 0, zero_head);
+    memset((uint8_t *)&command + mask_start, 0, dir_start - mask_start);
+    memset((uint8_t *)&command + after_dir, 0, refl_mats_start - after_dir);
+    memset((uint8_t *)&command + refl_stage2_start, 0, refl_stage2_tf_start - refl_stage2_start);
+    memset((uint8_t *)&command + pixel_prog_start, 0, sizeof command - pixel_prog_start);
     RecompD3dPresenterDrawCommand *draw = &command.data.draw;
+    draw->directional.enabled = false;
+    draw->directional.normalize = false;
+    draw->directional.stage_mode = false;
+    draw->directional.count = 0u;
+    memset(draw->directional.stage, 0, sizeof draw->directional.stage);
     draw->fvf = current_fvf(device);
     const bool program = (draw->fvf & 1u) != 0u;
     recomp_d3d8_target(&draw->target);
@@ -2208,7 +2422,7 @@ static void submit_draw(uint32_t primitive, uint32_t count, uint32_t vertices,
     /* An FVF draw reads stream 0 only; SC2 leaves a model's second stream
        bound across later FVF draws. Declarations name their streams. */
     const uint16_t *indices;
-    uint16_t *sequential = NULL;
+    uint16_t *writable_indices = NULL;
     uint32_t largest = count - 1u;
     uint32_t smallest = 0u;
     if (index_address != 0u) {
@@ -2220,35 +2434,30 @@ static void submit_draw(uint32_t primitive, uint32_t count, uint32_t vertices,
             if (indices[i] < smallest) smallest = indices[i];
         }
     } else {
-        sequential = malloc(count * sizeof *sequential);
-        if (sequential == NULL) recomp_stop(2, "d3d8:draw-index-allocation");
-        for (uint32_t i = 0u; i < count; ++i) sequential[i] = (uint16_t)i;
-        indices = sequential;
+        indices = sequential_index_table();
     }
     if (quads) {
         /* shortcut: use diagonal 0-2, verify the hardware split if quad interpolation differs. */
         static const uint32_t order[6] = {0u, 1u, 2u, 0u, 2u, 3u};
-        uint16_t *expanded_indices = malloc(triangles * 3u * sizeof *expanded_indices);
-        if (expanded_indices == NULL) recomp_stop(2, "d3d8:draw-index-allocation");
+        uint16_t *expanded_indices = scratch_alloc(&scratch_expanded_indices,
+            triangles * 3u * sizeof *expanded_indices, "d3d8:draw-index-allocation");
         for (uint32_t i = 0u; i < count / 4u; ++i)
             for (uint32_t j = 0u; j < 6u; ++j)
                 expanded_indices[i * 6u + j] = indices[i * 4u + order[j]];
-        free(sequential);
-        sequential = expanded_indices;
-        indices = sequential;
+        writable_indices = expanded_indices;
+        indices = expanded_indices;
         primitive = 5u;
         count = triangles * 3u;
     }
     if (line_strip) {
         /* Keep adjacent pairs in order for the existing width/antialias path. */
-        uint16_t *pairs = malloc(triangles * 2u * sizeof *pairs);
-        if (pairs == NULL) recomp_stop(2, "d3d8:draw-index-allocation");
+        uint16_t *pairs = scratch_alloc(&scratch_expanded_indices,
+            triangles * 2u * sizeof *pairs, "d3d8:draw-index-allocation");
         for (uint32_t i = 0u; i < triangles; ++i) {
             pairs[i * 2u] = indices[i];
             pairs[i * 2u + 1u] = indices[i + 1u];
         }
-        free(sequential);
-        sequential = pairs;
+        writable_indices = pairs;
         indices = pairs;
         primitive = 2u;
         count = triangles * 2u;
@@ -2256,23 +2465,21 @@ static void submit_draw(uint32_t primitive, uint32_t count, uint32_t vertices,
     /* Stage meshes index a few hundred vertices deep inside shared buffers;
        send only the indexed range (about 10 of 12 MB per frame otherwise). */
     if (smallest != 0u) {
-        if (sequential == NULL) {
-            sequential = malloc(count * sizeof *sequential);
-            if (sequential == NULL) recomp_stop(2, "d3d8:draw-index-allocation");
-            memcpy(sequential, indices, count * sizeof *sequential);
-            indices = sequential;
+        if (writable_indices == NULL) {
+            writable_indices = scratch_alloc(&scratch_indices, count * sizeof *writable_indices,
+                "d3d8:draw-index-allocation");
+            memcpy(writable_indices, indices, count * sizeof *writable_indices);
+            indices = writable_indices;
         }
-        for (uint32_t i = 0u; i < count; ++i) sequential[i] = (uint16_t)(sequential[i] - smallest);
+        for (uint32_t i = 0u; i < count; ++i) writable_indices[i] = (uint16_t)(writable_indices[i] - smallest);
         vertices += smallest * stride;
         largest -= smallest;
     }
     draw->vertex_count = largest + 1u;
-    uint8_t *packed = NULL;
     if (gather.active) {
         /* Declaration streams gathered into FVF order (declaration_fvf). */
         if (gather_first == UINT32_MAX) recomp_stop(2, "d3d8:gather-user-pointer");
-        packed = gather_vertices(gather_first + smallest, draw->vertex_count, layout.stride);
-        draw->vertex_bytes = packed;
+        draw->vertex_bytes = gather_vertices(gather_first + smallest, draw->vertex_count, layout.stride);
         draw->vertex_stride = layout.stride;
         draw->index_bytes = indices;
         draw->index_count = count;
@@ -2287,11 +2494,11 @@ static void submit_draw(uint32_t primitive, uint32_t count, uint32_t vertices,
         if (tail != 0u) {
             /* SetStateUP (0x3506f0) and DrawVerticesUP copy each declaration, then
                add stride - declaration size; overlapping records are valid. */
-            packed = malloc((size_t)layout.stride * draw->vertex_count);
-            if (packed == NULL) recomp_stop(2, "d3d8:draw-vertex-allocation");
+            uint8_t *packed_tail = scratch_alloc(&scratch_vertices, (size_t)layout.stride * draw->vertex_count,
+                "d3d8:draw-vertex-allocation");
             for (uint32_t i = 0u; i < draw->vertex_count; ++i)
-                memcpy(packed + i * layout.stride, (const uint8_t *)draw->vertex_bytes + i * stride, layout.stride);
-            draw->vertex_bytes = packed;
+                memcpy(packed_tail + i * layout.stride, (const uint8_t *)draw->vertex_bytes + i * stride, layout.stride);
+            draw->vertex_bytes = packed_tail;
             draw->vertex_stride = layout.stride;
         }
     }
@@ -2299,19 +2506,29 @@ static void submit_draw(uint32_t primitive, uint32_t count, uint32_t vertices,
     draw->triangle_count = triangles;
     bool flat = false;   /* (an orthographic projection: 2D art drawn through SetModelView) */
     if (!layout.pretransformed && !program) {
+        static bool cached_vp_valid, cached_vp_wide;
+        static float cached_view[16], cached_proj[16], cached_vp[16];
         float view[16], projection[16], world[16], vp[16], blend[3][16];
         recomp_guest_load(view, device + 0x840u, sizeof view);
         recomp_guest_load(projection, device + 0x880u, sizeof projection);
         recomp_guest_load(world, device + 0x9c0u, sizeof world);
         if (layout.blend_weight_count > 3u) recomp_stop(2, "d3d8:draw-vertex-blend");
-        recomp_guest_load(blend, device + 0xa00u, layout.blend_weight_count * sizeof blend[0]);
-        /* The game occasionally poses a mesh at a NaN position (seen after fights,
-           ret 0x28708b). NV2A vertices then become NaN and are clipped, so the
-           draw shows nothing; drop it instead of stopping. */
+        if (layout.blend_weight_count != 0u) {
+            recomp_guest_load(blend, device + 0xa00u, layout.blend_weight_count * sizeof blend[0]);
+        }
+        const bool frame_wide_now = recomp_d3d8_frame_wide();
         uint32_t nonfinite = 0u;
-        for (uint32_t i = 0u; i < 16u; ++i) {
-            nonfinite += !isfinite(view[i]) + !isfinite(projection[i]) + !isfinite(world[i]);
-            for (uint32_t b = 0u; b < layout.blend_weight_count; ++b) nonfinite += !isfinite(blend[b][i]);
+        const bool vp_hit = cached_vp_valid && cached_vp_wide == frame_wide_now &&
+            memcmp(view, cached_view, sizeof view) == 0 &&
+            memcmp(projection, cached_proj, sizeof projection) == 0;
+        if (!vp_hit) {
+            for (uint32_t i = 0u; i < 16u; ++i) {
+                nonfinite += !isfinite(view[i]) + !isfinite(projection[i]);
+            }
+        }
+        for (uint32_t i = 0u; i < 16u; ++i) nonfinite += !isfinite(world[i]);
+        for (uint32_t b = 0u; b < layout.blend_weight_count; ++b) {
+            for (uint32_t i = 0u; i < 16u; ++i) nonfinite += !isfinite(blend[b][i]);
         }
         if (nonfinite != 0u) {
             static uint32_t dropped;
@@ -2319,12 +2536,19 @@ static void submit_draw(uint32_t primitive, uint32_t count, uint32_t vertices,
             if ((dropped & (dropped - 1u)) == 0u)
                 fprintf(stderr, "recomp d3d8: dropped nonfinite-position draws=%u cells=%u ret=%08x\n",
                     dropped, nonfinite, *recomp_memory_u32(recomp_runtime.registers.esp));
-            free(sequential);
-            free(packed);
             return;
         }
-        widescreen_projection(projection);
-        multiply(view, projection, vp, "view-projection");
+        if (vp_hit) {
+            memcpy(vp, cached_vp, sizeof vp);
+        } else {
+            memcpy(cached_proj, projection, sizeof projection);
+            widescreen_projection(projection);
+            multiply(view, projection, vp, "view-projection");
+            memcpy(cached_view, view, sizeof view);
+            memcpy(cached_vp, vp, sizeof vp);
+            cached_vp_wide = frame_wide_now;
+            cached_vp_valid = true;
+        }
         if (model_view_active) {
             /* A model hides a part by scaling its joint to zero; the game's
                inverse scale then leaves NaNs in the composite, and NV2A draws
@@ -2338,8 +2562,6 @@ static void submit_draw(uint32_t primitive, uint32_t count, uint32_t vertices,
                 if ((hidden & (hidden - 1u)) == 0u)
                     fprintf(stderr, "recomp d3d8: dropped nonfinite-composite draws=%u ret=%08x\n",
                         hidden, *recomp_memory_u32(recomp_runtime.registers.esp));
-                free(sequential);
-                free(packed);
                 return;
             }
             composite_clip(device, draw->transform);
@@ -2390,6 +2612,7 @@ static void submit_draw(uint32_t primitive, uint32_t count, uint32_t vertices,
         memcpy(draw->scissor, clip, sizeof clip);
     }
     float moved_by = 0.0f;
+    uint8_t *packed = NULL;
     if (!program && (layout.pretransformed || flat) && widescreen_2d(&layout, draw, rect, stage0_textured(device), &packed, &moved_by) &&
         scissors != 0u) {
         const float centre = rect[0] + rect[2] * 0.5f;
@@ -2454,11 +2677,11 @@ static void submit_draw(uint32_t primitive, uint32_t count, uint32_t vertices,
     /* Every other draw goes to the general pixel program, lit and fogged by
        general_lighting and general_fog instead of attach_lighting's
        recognised paths. */
-    uint8_t *expanded = NULL, *transformed = NULL;
+    uint8_t *transformed = NULL;
     if (points && (program || *recomp_memory_u32(device + PIXEL_HANDLE) != 0u)) {
         recomp_stop(2, "d3d8:draw-points-unbound");
     } else if (points) {
-        expanded = point_sprites(device, &layout, draw);
+        (void)point_sprites(device, &layout, draw);
     } else {
         if (*recomp_memory_u32(device + PIXEL_HANDLE) != 0u) {
             general_combiners(device, &layout, draw);
@@ -2471,7 +2694,20 @@ static void submit_draw(uint32_t primitive, uint32_t count, uint32_t vertices,
     if (native_line) {
         draw->line_width = line_width();
         draw->line_antialias = state->edge_antialias != 0u;
-    } else if (primitive == 2u) expanded = widen_lines(program || !layout.pretransformed, draw);
+    } else if (primitive == 2u) {
+        (void)widen_lines(program || !layout.pretransformed, draw);
+    }
+    if (prep_t0 != 0ull) {
+        const uint64_t prep_t1 = draw_prep_now_ns();
+        if (prep_t1 >= prep_t0) {
+            const uint64_t delta = (prep_t1 - prep_t0) * 8ull;
+#if defined(__GNUC__) || defined(__clang__)
+            __atomic_fetch_add(&draw_prep_accum_ns, delta, __ATOMIC_RELAXED);
+#else
+            draw_prep_accum_ns += delta;
+#endif
+        }
+    }
     /* The free camera's clean view leaves out the game's 2D overlay (life
        bars, timer, names, menus): fixed-function draws already in screen
        space. Screen-space effect passes run a pixel shader and are kept. The
@@ -2481,8 +2717,6 @@ static void submit_draw(uint32_t primitive, uint32_t count, uint32_t vertices,
             recomp_scene_freeze_overlay_hidden()))
         recomp_d3d8_submit(&command);
     ++draw_submitted;
-    free(sequential);
-    free(expanded);
     free(transformed);
     free(packed);
 }
@@ -2775,10 +3009,10 @@ static void shader_constant_mode(void)
     kernel_return(1u, 0u);
 }
 
-/* Every 600 presents, so a run that is killed still leaves its inventory. */
+/* Every 600 presents when RECOMP_VERBOSE_D3D_LOG=1 (or at exit via report()). */
 static void on_present(uint32_t swap_counter)
 {
-    if (swap_counter % 600u == 0u) {
+    if (verbose_d3d_log() && swap_counter % 600u == 0u) {
         fprintf(stderr, "recomp d3d8 bring-up: after %u frames\n", swap_counter);
         report();
     }
@@ -2789,7 +3023,7 @@ RecompFunction recomp_d3d8_draw_lookup_manual(uint32_t address)
     static bool reporting;
     if (!reporting) {
         reporting = true;
-        atexit(report);
+        if (verbose_d3d_log()) atexit(report);
         /* (the in-game menu's hook comes first when the runner set one) */
         if (recomp_d3d_present_hook == NULL) recomp_d3d_present_hook = on_present;
     }
