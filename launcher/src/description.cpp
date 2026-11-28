@@ -238,6 +238,11 @@ const launcher::Description &launcher::describe() {
     static const Description about = [] {
         Description d;
         d.original = "on the Xbox";
+        // (the launcher shows only what is set before the game starts, the Resolution and Language, marked
+        // kFeatureLauncher in runtime/sc2_settings.cpp; everything else is the in-game menu's)
+        d.launcher_features_only = true;
+        d.features_name = "Settings";
+        d.layout = launcher::Description::Layout::Tabs; /* (the in-game menu's look: tabs along the top) */
         d.pages = {{"Guest", GuestPage, GuestDrop, GuestBusy}, {"Textures", TexturesPage, TexturesDrop, TexturesBusy}};
         d.open_on_game_page = true;
         d.notice = GuestNotice;

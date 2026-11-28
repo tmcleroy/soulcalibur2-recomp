@@ -14,8 +14,9 @@ The launcher is where the game is set up and started. Its pages:
 - **Online**: host, join with a code, your name, the waiting room and the lobby's open matches.
 - **Guest**: your GameCube and/or PlayStation 2 disc, and the button that builds the guests from them.
 - **Textures**: an HD texture pack (below), imported from the folder you unzipped it to.
-- **Features**: the switches, in presets (*Original* plays exactly as the Xbox did; *Enhanced* turns on the
-  improvements) or one by one.
+- **Settings**: what is set before the game starts (the resolution, and the European disc's language), in presets
+  (*Original* plays exactly as the Xbox did; *Enhanced* turns on the improvements) or one by one. The other options
+  are in the in-game menu.
 - **Controllers**: both players' keys and gamepad buttons, and which connected gamepad is which player's
   (Automatic, a player, or Not used).
 
@@ -59,13 +60,13 @@ a control). The same close it from any page; Backspace or B goes back a page. Th
 choose (held, they repeat), Enter, Space or A confirm; the mouse works it too (a click chooses, the right button goes
 back, the wheel moves). On it, as in the other ports:
 
-- **Online** (below), **Display** (the shader, HD textures, the FPS counter) and **Game**: the **Speed** (from 1/8 up
-  to 8x), **Mute**, and the **Cheats** and **Pictures** pages (below).
-- **Alternative modes**: **Training mode** (below) and the endless battle.
-- **Save state**, **Load state** and **Slot**: nine slots, kept while the game runs. A state loads in the scene it
-  was saved in (the same fight, the same menu).
-- **Reset all options** (every option back to the launcher's Enhanced preset, the speed to full), **Reset game** (the
-  game started again as if switched off and on: the window closes and opens again), **Quit game** and **Resume**.
+- **A row at the top**: **Back**, **Save state**, **Load state**, **Slot** (nine, kept while the game runs; a
+  state loads in the scene it was saved in), **Reset game** (the game started again as if switched off and on: the
+  window closes and opens again), **Quit game** and **Resume**.
+- **Tabs**, changed with Q and E (or LB and RB): **Game** (the **Speed**, from 1/8 up to 8x, **Mute**, **Reset all
+  options**: every option back to the launcher's Enhanced preset, the speed to full), **Display** (the shader, HD
+  textures, the FPS counter), **Sound**, **Online**, **Training** (below), **Modes** (the endless battle), **Cheats**
+  and **Capture** (**Pictures**, below). X (or Delete) puts an option back as the Enhanced preset has it.
 
 While playing (not online):
 
@@ -83,7 +84,7 @@ While playing (not online):
 
 ## Training
 
-On the menu's Training mode page, under Alternative modes (and the launcher's Features page). The hit boxes, frame data, input display and combo
+On the menu's Training tab. The hit boxes, frame data, input display and combo
 readout show in Practice; start over, the dummy and the aids work in any fight.
 
 | | |
@@ -117,13 +118,16 @@ Practice mode's own options (the dummy's guard and actions, its attack data) are
 | No damage (each player), One-hit knockouts | Cheats, as in the menu |
 | Ping, Input delay, Hide names | What an online match shows |
 
+Only the Resolution and the European disc's Language are on the launcher's Settings page, as they are set before the
+game starts; the rest are in the in-game menu.
+
 Widescreen (the game's own 16:9 mode: fights shown wide, menus, screens and the HUD kept in their 4:3 shape in the middle), full screen and the free camera are
 on the launcher's Game page.
 
 ## Shaders
 
 The picture through one of RetroArch's [slang shaders](https://github.com/libretro/slang-shaders) (the Graphics
-page's **Shader**, and the in-game menu's): a curved CRT, CRT Lottes, CRT Royale, CRT Guest or a light CRT;
+tab's **Shader** in the in-game menu): a curved CRT, CRT Lottes, CRT Royale, CRT Guest or a light CRT;
 scanlines light, strong or as an OSSC draws them; or xBRZ and ScaleFX to smooth edges. The shader always sees the
 game's picture at the Xbox's own 640x480, so its scanlines are the game's 480 lines at any resolution (a higher
 resolution still makes that picture cleaner: it is averaged down). **Your own** takes the first RetroArch slang
@@ -135,7 +139,7 @@ screenshots and the runtime's text are without the shader. A preset that cannot 
 ## HD textures
 
 The game draws textures from a `textures` folder beside your settings (below) in place of its own, while **HD
-textures** is on (the Features page, Graphics, or the in-game menu: it switches while playing).
+textures** is on (the in-game menu's Display tab: it switches while playing).
 
 - **The GameCube's HD pack**: *Soulcalibur 2 Complete HD Textures*, an AI upscale (ESRGAN, 4x) made for Dolphin and
   the GameCube disc (GRSEAF), shared on the

@@ -10,7 +10,7 @@ namespace sc2 {
 /* Installs the menu at each Swap (recomp_d3d_present_hook). The keys and
    buttons the player gave the game (settings.ini) never open it. `shot`, for
    tests, is PRESENT:KEYS:FILE.bmp: at that Swap the menu opens, takes KEYS one
-   a frame (u d l r: directions, c: confirm, b: back), saves its picture to
+   a frame (u d l r: directions, c: confirm, b: back, q e: the tab before and after), saves its picture to
    FILE.bmp and closes. */
 void InstallMenu(const std::string &settingsPath, const std::string &shot);
 

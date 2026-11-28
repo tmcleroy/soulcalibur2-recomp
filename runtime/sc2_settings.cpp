@@ -61,7 +61,7 @@ const std::vector<recomp::FeatureInfo> &Features()
     static const std::vector<recomp::FeatureInfo> features = {
         {"resolution", "Graphics", "Resolution", "Draws the game at a multiple of the Xbox's 640x480. Above 4x needs a fast graphics card: 6x and 8x are "
             "for a 4K screen.",
-            recomp::kFeatureEnhanced, {"Original (640x480)", "2x (1280x960)", "3x (1920x1440)", "4x (2560x1920)",
+            recomp::kFeatureEnhanced | recomp::kFeatureLauncher, {"Original (640x480)", "2x (1280x960)", "3x (1920x1440)", "4x (2560x1920)",
                 "5x (3200x2400)", "6x (3840x2880)", "8x (5120x3840)"}},
         {"shader", "Graphics", "Shader",
             "The picture drawn through one of RetroArch's shaders, at the Xbox's 480 lines whatever the resolution. "
@@ -84,7 +84,7 @@ const std::vector<recomp::FeatureInfo> &Features()
         {"language", "Game", "Language",
             "The language of the game's text: menus, profiles and messages. Only the European disc (Europe, Australia) "
             "has other languages, so this is offered only with it. Takes effect when the game starts.",
-            0, {"English", "Deutsch", "Fran\u00e7ais", "Espa\u00f1ol", "Italiano"}},
+            recomp::kFeatureLauncher, {"English", "Deutsch", "Fran\u00e7ais", "Espa\u00f1ol", "Italiano"}},
         {"full_height", "Graphics", "Fill the screen's height",
             "The picture without the Xbox's black bars at its top and bottom, its 448 lines over the whole height as "
             "the GameCube and PS2 versions show them (a little taller). Off: as the Xbox shows it.", 0, {}},

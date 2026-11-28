@@ -17,6 +17,7 @@
 #include <future>
 #include <memory>
 #include <mutex>
+#include <map>
 #include <string>
 #include <thread>
 #include <vector>
@@ -142,6 +143,18 @@ private:
     };
 
     // A game's feature on the pages: the port's feature_shown, given the game's file if it was found good
+    // The Tabs layout (Description::layout): the pages as tabs along the top, a collection's games as a grid
+    bool tabbed() const { return about_.layout == launcher::Description::Layout::Tabs; }
+    void top_bar(float width);
+    void find_card(float width);
+    int tab_count() const;
+    void library_grid(float width);
+    void library_pane(size_t which, float width, float height);
+    void open_details(size_t which);
+    SDL_Texture* tile_picture(size_t which, int& w, int& h);
+    bool in_launcher(const recomp::FeatureInfo& info) const;
+    void board_card(size_t which, float width);
+    void controller_features_card(float width);
     bool feature_shown(const Slot& one, size_t feature);
     // ... and which of its choices the port's choice_shown leaves out (empty: none)
     std::vector<bool> hidden_choices(const Slot& one, size_t feature);
@@ -390,6 +403,17 @@ private:
     const launcher::Collection* collection_ = nullptr;  // a collection's launcher's (a port's: none)
     SDL_Window* window_;
     int page_ = 0;
+    // (the Tabs layout: the game chosen in the grid, and each game's picture: its last screen, picture.png, or its
+    // newest screenshot; looked for again now and then)
+    size_t picked_game_ = static_cast<size_t>(-1);
+    struct Picture {
+        std::filesystem::path path;
+        std::filesystem::file_time_type time{};
+        SDL_Texture* texture = nullptr;
+        int w = 0, h = 0;
+        Uint64 looked = 0;
+    };
+    std::map<std::string, Picture> pictures_;
     std::filesystem::path folder_;          // the player's (a collection's: its own, with its launcher.ini)
     recomp::Ini prefs_;     // launcher.ini: where each game's file is, the Display switches
     std::filesystem::path program_folder_;  // the launcher's
