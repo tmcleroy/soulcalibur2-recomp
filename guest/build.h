@@ -43,7 +43,7 @@ void build_guests_root(const DiscFile &xbox, const DiscFile *gamecube, const Dis
    noticed: the launcher asks for a rebuild, and online play compares it (two
    players need the same file). build_guests_root writes it beside the file, as
    <output>.version ("sc2-guests N"). */
-constexpr int GUESTS_VERSION = 8;
+constexpr int GUESTS_VERSION = 9;
 
 /* The version a guests' file was built with: 0 when it has no stamp (built
    before stamps, or a build that did not finish). */
@@ -55,6 +55,11 @@ constexpr uint32_t TITLE_FIRST = 12, TITLE_PICTURES = 3;
 /* ... and after those, the Collection History's pictures of the guests' own items: Link's weapon demonstration and his
    two outfits (the GameCube's /2/344-346), Heihachi's demonstration (the PS2's /2/344). */
 constexpr uint32_t EXTRA_PICTURES = 4;
+/* ... and after those, the GameCube's music for Link: its bgm.afs track 66, The Legend of Zelda's theme (an ADX
+   stream, 32 kHz, looping), which it plays in Link's destined battle, his profile and the Exhibition Theater
+   (runtime/sc2_guest_music.c); empty for a GameCube disc not given. The Xbox's bgm.afs has no such track (its tracks
+   from 65 on are the GameCube's from 67). */
+constexpr uint32_t LINK_THEME_TRACK = 66;
 
 /* The PS2 disc's program (Soulcalibur II, USA). */
 constexpr const char *PS2_ID = "SLUS_206.43";

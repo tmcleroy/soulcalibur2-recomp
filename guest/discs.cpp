@@ -110,6 +110,19 @@ Bytes beside(const std::string &path, const std::string &name)
     }
 }
 
+/* Track `track` of an AFS archive read through `read` (offsets from the archive's start) */
+Bytes afs_track(const std::function<Bytes(uint64_t, size_t)> &read, uint32_t track)
+{
+    const Bytes head = read(0, 8);
+    if (head.size() < 8 || std::memcmp(head.data(), "AFS", 3) != 0) throw Error("bgm.afs is not an AFS archive");
+    if (track >= le32(head, 4)) throw Error("bgm.afs has no track " + std::to_string(track));
+    const Bytes entry = read(8 + 8 * uint64_t(track), 8);
+    if (entry.size() < 8) throw Error("bgm.afs cut short");
+    Bytes out = read(le32(entry, 0), le32(entry, 4));
+    if (out.size() != le32(entry, 4)) throw Error("bgm.afs cut short");
+    return out;
+}
+
 /* A DOL's size: its sections' furthest end (7 text and 11 data: offsets at 0, sizes at 0x90). */
 uint64_t dol_size(const Bytes &head)
 {
@@ -242,7 +255,14 @@ DiscFile open_other_root(const std::string &path, bool &ps2)
     const Olnk root(file.read, 0);
     const auto parts = pack_parts(root.child(4).bytes(46), false);
     ps2 = parts && !parts->empty() && parts->at(0).size() > 2 && parts->at(0)[0] == 8 && parts->at(0)[1] == 0x0c;
-    if (!ps2) file.program = [path]() { return beside(path, "boot.dol"); };
+    if (!ps2) {
+        file.program = [path]() { return beside(path, "boot.dol"); };
+        file.music = [path](uint32_t track) {
+            const size_t slash = path.find_last_of("/\\");
+            auto bgm = std::make_shared<File>((slash == std::string::npos ? std::string() : path.substr(0, slash + 1)) + "bgm.afs");
+            return afs_track([bgm](uint64_t o, size_t n) { return bgm->read(o, n); }, track);
+        };
+    }
     return file;
 }
 
@@ -268,6 +288,22 @@ DiscFile open_gamecube_root(const std::string &path)
     if (fst.size() < 12) throw Error("GameCube FST missing");
     const uint32_t count = be32(fst, 8);
     const size_t strings = size_t(count) * 12;
+    uint64_t bgm_base = 0, bgm_size = 0;
+    for (uint32_t i = 1; i < count; ++i) {
+        const size_t e = size_t(i) * 12;
+        if (fst.at(e) != 0) continue;   /* a directory */
+        const uint32_t name = be32(fst, e) & 0xffffff;
+        std::string s;
+        for (size_t p = strings + name; p < fst.size() && fst[p]; ++p) s.push_back(char(fst[p]));
+        if (s == "bgm.afs" && be32(fst, e + 8) > bgm_size) {
+            bgm_base = be32(fst, e + 4);
+            bgm_size = be32(fst, e + 8);
+        }
+    }
+    if (bgm_size)
+        out.music = [image, bgm_base](uint32_t track) {
+            return afs_track([image, bgm_base](uint64_t o, size_t n) { return image.read(bgm_base + o, n); }, track);
+        };
     for (uint32_t i = 1; i < count; ++i) {
         const size_t e = size_t(i) * 12;
         if (fst.at(e) != 0) continue;   /* a directory */

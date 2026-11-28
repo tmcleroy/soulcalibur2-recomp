@@ -72,6 +72,8 @@ void sc2_records_load(const uint8_t *at);
 /* The /2 entry of a guest's Collection History picture past the title pictures (0 Link's demonstration, 1 and 2 his
    outfits, 3 Heihachi's demonstration), or -1 in a guests' file built before them */
 int sc2_guest_extra_picture(unsigned which);
+/* The GameCube's music for Link (an ADX stream), or NULL in a guests' file built before it or without that disc */
+const uint8_t *sc2_guest_link_theme(uint32_t *size);
 
 /* The Art Gallery's Hi-Res pictures: 20, or more with the guests' (sc2_guest.cpp, ApplyGallery). */
 void sc2_guest_gallery_open(uint32_t object, uint32_t gallery);

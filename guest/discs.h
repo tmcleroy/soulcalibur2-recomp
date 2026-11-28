@@ -23,6 +23,10 @@ struct DiscFile {
        root.olk given itself, the file of that name beside it); throws Error
        when it cannot be read. */
     std::function<Bytes()> program;
+    /* A track of the disc's music (bgm.afs, an AFS archive: 'AFS', u32 count, then u32 offset and size of each, from
+       the archive's start) for the GameCube disc (and a root.olk given itself, its bgm.afs beside it), else empty;
+       throws Error when it cannot be read. */
+    std::function<Bytes(uint32_t)> music;
 };
 
 /* root.olk from an Xbox disc image (XDVDFS), or a root.olk file itself. */

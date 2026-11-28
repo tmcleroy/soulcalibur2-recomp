@@ -25,6 +25,10 @@
 - **Extra Time Attack's guest is Heihachi**: the guest's fight in Extra Time Attack (stage 6 of Standard, and the
   Extreme course's) was drawn between Spawn, Link and Heihachi, and the draw came out Link every run. The mode's fights
   are set, to race the clock, so it is now Heihachi, as in Soulcalibur II HD Online (Spawn without the PS2's disc).
+- **The Legend of Zelda's theme for Link**: the GameCube version plays Link's own music, the Zelda theme, in his
+  character profile and the Exhibition Theater, in Arcade's destined battle against him and in several modes'
+  fights; the Xbox's music has no such track. The guests' file now takes it from the GameCube disc, and it plays where
+  the GameCube plays it. Build the guests again after updating (the launcher asks).
 - **Link and Heihachi in the Records**: the Records' character usage page ranked the 24 characters of the Xbox's
   roster, and the guests' plays were counted as Spawn's. They now have records of their own, ranked on the usage
   and win ratio pages with everyone else, and kept in the save (records from before count as Spawn's, as they were).
